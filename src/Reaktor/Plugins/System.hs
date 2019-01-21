@@ -9,7 +9,7 @@ import           Control.Applicative
 import           Control.Concurrent (forkIO)
 import           Control.Exception (finally)
 import           Data.Aeson
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Map as M
 import           Reaktor.Message
 import           Reaktor.Plugins.System.Types

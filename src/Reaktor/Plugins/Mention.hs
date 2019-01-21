@@ -4,7 +4,7 @@ module Reaktor.Plugins.Mention (plugin) where
 
 import           Control.Monad (when)
 import           Data.Aeson
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Char
 import           Reaktor.Message
 import           Reaktor.Types

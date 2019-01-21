@@ -3,7 +3,7 @@ module Reaktor.Parser where
 
 import           Control.Applicative
 import           Data.Attoparsec.ByteString.Char8
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Char
 import           Reaktor.Types
 

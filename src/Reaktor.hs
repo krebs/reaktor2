@@ -12,7 +12,7 @@ import           Control.Monad.Trans.State.Lazy
 import           Data.Aeson
 import           Data.Attoparsec.ByteString.Char8 (IResult(Done,Fail,Partial))
 import           Data.Attoparsec.ByteString.Char8 (feed,parse)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import           Data.Foldable (toList)
 import qualified Data.Text as T
 import           Data.Time.Clock.System

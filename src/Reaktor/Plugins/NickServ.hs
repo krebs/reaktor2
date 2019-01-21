@@ -7,7 +7,7 @@ module Reaktor.Plugins.NickServ (plugin) where
 import           Control.Monad (when)
 import           Data.Aeson
 import           Data.Aeson.Types (parseEither)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import           GHC.Generics
 import           Reaktor.Message
 import           Reaktor.Types

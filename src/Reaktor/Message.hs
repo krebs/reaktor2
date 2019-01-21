@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Reaktor.Message where
 
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import           Reaktor.Types
 
 

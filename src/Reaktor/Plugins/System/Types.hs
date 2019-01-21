@@ -2,7 +2,7 @@
 module Reaktor.Plugins.System.Types where
 
 import           Data.Aeson
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Map as M
 import           Reaktor.Types ()
 

@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Reaktor.Types (module Reaktor.Types, module X) where
 
 import           Blessings (Blessings)
@@ -8,8 +7,7 @@ import           Control.Monad.Trans.State as X (gets,modify)
 import           Control.Monad.Trans.State (StateT)
 import           Data.Aeson
 import           Data.Aeson.Types
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text.Encoding as T
+import qualified Data.ByteString.Char8.Extended as BS
 import           Network.Socket as X (HostName,ServiceName)
 
 
@@ -58,11 +56,3 @@ type Param = BS.ByteString
 type Command = BS.ByteString
 data Message = Message (Maybe Prefix) Command [Param]
   deriving Show
-
-
-instance FromJSON BS.ByteString where
-  parseJSON (String t) = pure (T.encodeUtf8 t)
-  parseJSON _ = pure undefined
-
-instance FromJSONKey BS.ByteString where
-  fromJSONKey = FromJSONKeyText T.encodeUtf8

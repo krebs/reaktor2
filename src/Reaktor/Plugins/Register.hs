@@ -6,7 +6,7 @@ module Reaktor.Plugins.Register (plugin) where
 
 import           Control.Monad (when)
 import           Data.Aeson
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import           GHC.Generics
 import           Reaktor.Types
 import           Reaktor.Utils (nextNick,randomNick)

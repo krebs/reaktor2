@@ -1,6 +1,6 @@
 module Reaktor.Utils where
 
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import           Data.Char (chr)
 import           Data.Char (isDigit)
 import           Reaktor.Types
