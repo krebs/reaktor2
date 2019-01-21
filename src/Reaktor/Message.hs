@@ -2,7 +2,7 @@
 module Reaktor.Message where
 
 import qualified Data.ByteString.Char8.Extended as BS
-import           Reaktor.Types
+import           Reaktor.Internal
 
 
 privmsg :: BS.ByteString -> [BS.ByteString] -> Message

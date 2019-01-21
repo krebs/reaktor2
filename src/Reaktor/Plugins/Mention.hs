@@ -6,8 +6,8 @@ import           Control.Monad (when)
 import           Data.Aeson
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Char
+import           Reaktor.Internal
 import           Reaktor.Message
-import           Reaktor.Types
 
 
 plugin :: Value -> IO Plugin

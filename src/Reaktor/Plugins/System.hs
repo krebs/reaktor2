@@ -12,8 +12,8 @@ import           Data.Aeson
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Map as M
 import           Reaktor.Message
-import           Reaktor.Plugins.System.Types
-import           Reaktor.Types
+import           Reaktor.Internal
+import           Reaktor.Plugins.System.Internal
 import           System.Environment (getEnvironment)
 import           System.FilePath.Posix (takeBaseName)
 import           System.IO (Handle,hClose,hPutStr,hIsEOF)

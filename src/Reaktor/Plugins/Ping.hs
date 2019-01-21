@@ -3,7 +3,7 @@ module Reaktor.Plugins.Ping (plugin) where
 
 import           Control.Monad (when)
 import           Data.Aeson (Value(Null))
-import           Reaktor.Types
+import           Reaktor.Internal
 
 
 plugin :: Value -> IO Plugin

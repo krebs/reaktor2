@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Plugins.System.Types where
+module Reaktor.Plugins.System.Internal where
 
 import           Data.Aeson
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Map as M
-import           Reaktor.Types ()
+import           Reaktor.Internal ()
 
 
 -- TODO this needs better names :)

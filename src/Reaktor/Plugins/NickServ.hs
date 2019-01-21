@@ -9,8 +9,8 @@ import           Data.Aeson
 import           Data.Aeson.Types (parseEither)
 import qualified Data.ByteString.Char8.Extended as BS
 import           GHC.Generics
+import           Reaktor.Internal
 import           Reaktor.Message
-import           Reaktor.Types
 import           Reaktor.Utils (randomNick)
 
 

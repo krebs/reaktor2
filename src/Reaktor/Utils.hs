@@ -3,7 +3,7 @@ module Reaktor.Utils where
 import qualified Data.ByteString.Char8.Extended as BS
 import           Data.Char (chr)
 import           Data.Char (isDigit)
-import           Reaktor.Types
+import           Reaktor.Internal
 import           System.Random (getStdRandom, randomR)
 
 

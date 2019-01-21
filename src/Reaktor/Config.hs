@@ -4,8 +4,8 @@ module Reaktor.Config where
 import           Data.Aeson
 import qualified Data.HashMap.Lazy as HML
 import qualified Data.Text as T
+import           Reaktor.Internal
 import qualified Reaktor.Plugins
-import           Reaktor.Types
 
 
 instance FromJSON Config where

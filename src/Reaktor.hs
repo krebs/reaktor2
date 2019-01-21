@@ -20,9 +20,9 @@ import           Data.Time.Format
 import qualified Network.Simple.TCP as TCP
 import qualified Network.Simple.TCP.TLS as TLS
 import           Reaktor.Config
+import           Reaktor.Internal
 import           Reaktor.Parser (message)
 import qualified Reaktor.Plugins
-import           Reaktor.Types
 import           System.IO (BufferMode(LineBuffering),hSetBuffering)
 import           System.IO (Handle)
 import           System.IO (hIsTerminalDevice)

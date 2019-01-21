@@ -8,7 +8,7 @@ import           Control.Monad (when)
 import           Data.Aeson
 import qualified Data.ByteString.Char8.Extended as BS
 import           GHC.Generics
-import           Reaktor.Types
+import           Reaktor.Internal
 import           Reaktor.Utils (nextNick,randomNick)
 
 

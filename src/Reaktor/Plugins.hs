@@ -9,7 +9,7 @@ import qualified Reaktor.Plugins.NickServ
 import qualified Reaktor.Plugins.Ping
 import qualified Reaktor.Plugins.Register
 import qualified Reaktor.Plugins.System
-import           Reaktor.Types (Plugin)
+import           Reaktor.Internal (Plugin)
 
 
 get :: T.Text -> Value -> IO Plugin

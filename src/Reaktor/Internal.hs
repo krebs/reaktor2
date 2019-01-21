@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Types (module Reaktor.Types, module X) where
+module Reaktor.Internal (module Reaktor.Internal, module X) where
 
 import           Blessings (Blessings)
 import           Control.Monad.Trans.Class as X (lift)
