@@ -1,26 +1,22 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Plugins.Mention (plugin) where
+{-# LANGUAGE RecordWildCards #-}
+module Reaktor.Plugins.Mention (new) where
 
-import           Control.Monad (when)
-import           Data.Aeson
+import Prelude.Extended
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Char
-import           Reaktor.Internal
-import           Reaktor.Message
+import Reaktor
 
 
-plugin :: Value -> IO Plugin
-plugin _ = return (Plugin run False)
-
-
-run :: PluginFunc
-run = \case
-    Message _ "PRIVMSG" (msgtarget:text:[]) -> do
-        nick <- getNick
-        when (isMention nick text) $ do
-          sendMsg (privmsg msgtarget ["I'm famous!"])
-    _ -> return ()
+new :: Actions -> IO (Message -> IO ())
+new Actions{..} = do
+    pure $ \case
+      Message _ "PRIVMSG" (msgtarget:text:[]) -> do
+          nick <- aGetNick
+          when (isMention nick text) $ do
+            aSend (privmsg msgtarget ["I'm famous!"])
+      _ -> return ()
   where
     isMention nick text =
       not (BS.isPrefixOf (nick <> ":") text) &&

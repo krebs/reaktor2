@@ -1,15 +1,15 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Plugins.Ping (plugin) where
+{-# LANGUAGE RecordWildCards #-}
+module Reaktor.Plugins.Ping where
 
-import           Control.Monad (when)
-import           Data.Aeson (Value(Null))
-import           Reaktor.Internal
+import Prelude.Extended
+import Reaktor
 
-
-plugin :: Value -> IO Plugin
-plugin = simplePlugin (\Null -> run)
-
-run :: PluginFunc
-run (Message _ ircCommand args) =
-    when (ircCommand == "PING") $
-      sendMsg (Message Nothing "PONG" args)
+new :: Actions -> IO (Message -> IO ())
+new Actions{..} =
+    return $ \case
+      Message _ cmd args ->
+        when (cmd == "PING") $
+          aSend (Message Nothing "PONG" args)
+      _ -> pure ()

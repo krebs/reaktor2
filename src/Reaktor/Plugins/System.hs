@@ -2,58 +2,49 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Plugins.System (plugin) where
+{-# LANGUAGE RecordWildCards #-}
+module Reaktor.Plugins.System (new) where
 
-import           Blessings
-import           Control.Applicative
-import           Control.Concurrent (forkIO)
-import           Control.Exception (finally)
-import           Data.Aeson
+--import Prelude.Extended
+import Blessings
+import Control.Applicative
+import Control.Concurrent (forkIO)
+import Control.Exception (finally)
+--import Data.Aeson
+import Data.ByteString.Char8.Extended (ByteString)
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Map as M
-import           Reaktor.Message
-import           Reaktor.Internal
-import           Reaktor.Plugins.System.Internal
-import           System.Environment (getEnvironment)
-import           System.FilePath.Posix (takeBaseName)
-import           System.IO (Handle,hClose,hPutStr,hIsEOF)
-import           System.IO (BufferMode(LineBuffering),hSetBuffering)
-import           System.Process (StdStream(CreatePipe),waitForProcess)
-import           System.Process (createProcess,CreateProcess(..),proc)
+import Reaktor
+import System.Environment (getEnvironment)
+import System.FilePath.Posix (takeBaseName)
+import System.IO (BufferMode(LineBuffering),hSetBuffering)
+import System.IO (Handle,hClose,hPutStr,hIsEOF)
+import Reaktor.Plugins.System.Internal -- TODO rename to Reaktor.Plugins.System again
+import System.Process (StdStream(CreatePipe),waitForProcess)
+import System.Process (createProcess,CreateProcess(..),proc)
 import qualified Text.Regex.PCRE.Heavy as RE
 import qualified Text.Regex.PCRE.Light as RE
 
 
-plugin :: Value -> IO Plugin
-plugin = simplePlugin run
+new :: Config -> Actions -> IO (Message -> IO ())
+new config@Config{..} actions@Actions{..} = do
+    pure $ \case
+        Message (Just prefix) "PRIVMSG" (msgtarget:text:[]) -> do
+
+          nick_ <- aGetNick
+          let hs = maybe [] id (M.lookup "PRIVMSG" cHooks)
+          mapM_ (\h -> run1 config actions nick_ h prefix msgtarget text) hs
+
+        Message (Just prefix) "JOIN" (channel:[]) -> do
+          nick_ <- aGetNick
+          let hs = maybe [] id (M.lookup "JOIN" cHooks)
+          mapM_ (\h -> run1 config actions nick_ h prefix channel "") hs
+
+        _ -> pure ()
 
 
--- TODO indicated whether other plugins should run
-run :: SystemConfig -> PluginFunc
-
-run cfg (Message (Just prefix) "PRIVMSG" (msgtarget:text:[])) = do
-    nick_ <- getNick
-    let hs = maybe [] id (M.lookup "PRIVMSG" (hooks cfg))
-    mapM_ (\h -> run1 cfg nick_ h prefix msgtarget text) hs
-
-run cfg (Message (Just prefix) "JOIN" (channel:[])) = do
-    nick_ <- getNick
-    let hs = maybe [] id (M.lookup "JOIN" (hooks cfg))
-    mapM_ (\h -> run1 cfg nick_ h prefix channel "") hs
-
--- TODO warning?
-run _ _ = return ()
-
-
-run1 ::
-    SystemConfig
-    -> Nickname
-    -> SystemParams
-    -> BS.ByteString
-    -> BS.ByteString
-    -> BS.ByteString
-    -> PluginIO ()
-run1 cfg nick_ params prefix msgtarget text = do
+run1 :: Config -> Actions -> ByteString -> SystemParams -> ByteString -> ByteString -> ByteString -> IO ()
+run1 config@Config{..} actions@Actions{..} nick_ params prefix msgtarget text = do
     let
         isActivated =
           case activate params of
@@ -88,6 +79,7 @@ run1 cfg nick_ params prefix msgtarget text = do
 
         from = BS.takeWhile (/='!') prefix
           --maybe prefix (flip BS.take prefix) $ BS.findIndex (=='!') prefix
+
     case isActivated of
       Just trigger -> do
         let cmdline = BS.dropWhile (==' ') $ BS.drop (BS.length trigger) text
@@ -141,36 +133,35 @@ run1 cfg nick_ params prefix msgtarget text = do
 
         case command' of
           Just c -> do
-            sendMsg_ <- gets s_sendMsg
-            putLog_ <- gets s_putLog
+            -- aSend <- gets s_sendMsg
+            -- putLog_ <- gets s_putLog
             let onErrLine s =
-                  putLog_ $ SGR [31,1] $
+                  aLog $ SGR [31,1] $
                     Plain (BS.pack (takeBaseName $ commandPath c) <> ": "<> s)
 
                 onOutLine s =
-                  sendMsg_ (privmsg audience [s])
+                  aSend (privmsg audience [s])
 
                 extraEnv = [("_prefix", BS.unpack prefix),
                             ("_from", BS.unpack from)]
 
-            lift $ fork cfg c args' (Just extraEnv) "" onOutLine onErrLine
+            fork config actions c args' (Just extraEnv) "" onOutLine onErrLine
 
           Nothing -> do
-            sendMsg (privmsg audience (resultPrefix <> [cmdName <> ": command not found"]))
+            aSend (privmsg audience (resultPrefix <> [cmdName <> ": command not found"]))
 
       Nothing -> return ()
 
-
-
-fork :: SystemConfig
+fork :: Config
+     -> Actions
      -> SystemCommand
      -> [String]
      -> Maybe [(String, String)]
      -> String
-     -> (BS.ByteString -> IO ())
-     -> (BS.ByteString -> IO ())
+     -> (ByteString -> IO ())
+     -> (ByteString -> IO ())
      -> IO ()
-fork cfg cmd args extraEnv input onOutLine onErrLine = do
+fork Config{..} Actions{..} cmd args extraEnv input onOutLine onErrLine = do
 
     baseEnv <- getEnvironment
 
@@ -183,7 +174,7 @@ fork cfg cmd args extraEnv input onOutLine onErrLine = do
     (inh, outh, errh) <- do
       (Just inh, Just outh, Just errh, ph) <-
         createProcess (proc (commandPath cmd) args) {
-          cwd = commandWorkDir cmd <|> defaultWorkDir cfg,
+          cwd = commandWorkDir cmd <|> cDefaultWorkDir,
           env = Just procEnv,
           std_in = CreatePipe,
           std_out = CreatePipe,
@@ -202,7 +193,7 @@ fork cfg cmd args extraEnv input onOutLine onErrLine = do
       ]
 
 
-hWithLines :: Handle -> (BS.ByteString -> IO ()) -> IO ()
+hWithLines :: Handle -> (ByteString -> IO ()) -> IO ()
 hWithLines h f = do
     hSetBuffering h LineBuffering
     go `finally` hClose h

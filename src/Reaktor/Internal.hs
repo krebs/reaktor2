@@ -1,58 +1,68 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Internal (module Reaktor.Internal, module X) where
+{-# LANGUAGE RecordWildCards #-}
+module Reaktor.Internal where
 
-import           Blessings (Blessings)
-import           Control.Monad.Trans.Class as X (lift)
-import           Control.Monad.Trans.State as X (gets,modify)
-import           Control.Monad.Trans.State (StateT)
-import           Data.Aeson
-import           Data.Aeson.Types
+import Blessings
+import Data.Aeson
+import Data.ByteString (ByteString)
+import Network.Socket as Exports (HostName,ServiceName)
+import Prelude.Extended
 import qualified Data.ByteString.Char8.Extended as BS
-import           Network.Socket as X (HostName,ServiceName)
+import System.IO
 
 
-type Prefix = BS.ByteString
+data Actions = Actions
+    { aIsSecure :: Bool
 
-type Nickname = BS.ByteString
-type Password = BS.ByteString
-type MsgTarget = BS.ByteString
-type Channel = MsgTarget
+    , aSend :: Message -> IO ()
+    , aSendQuiet :: Message -> IO ()
 
-data PluginState = PluginState {
-      s_putLog :: Blessings BS.ByteString -> IO (),
-      s_nick :: BS.ByteString,
-      s_sendMsg :: Message -> IO (),
-      s_sendMsg' :: Message -> Message -> IO ()
+    , aLog :: Blessings ByteString -> IO ()
+    , aLogMsg :: Message -> IO ()
+
+    , aSetNick :: ByteString -> IO ()
+    , aGetNick :: IO ByteString
     }
 
-setNick :: Nickname -> PluginIO ()
-setNick newnick = modify (\q -> q { s_nick = newnick })
 
-getNick :: PluginIO Nickname
-getNick = gets s_nick
-
-sendMsg :: Message -> PluginIO ()
-sendMsg msg = gets s_sendMsg >>= \f -> lift $ f msg
-
-sendMsg' :: Message -> Message -> PluginIO ()
-sendMsg' msg logMsg = gets s_sendMsg' >>= \f -> lift $ f msg logMsg
-
-
-type PluginIO = StateT PluginState IO
-
-type PluginFunc = Message -> PluginIO ()
-
-data Plugin = Plugin {
-      pluginFunc :: PluginFunc,
-      requireTLS :: Bool
+data Config = Config
+    { cUseTLS :: Bool
+    , cHostName :: HostName
+    , cServiceName :: ServiceName
+    , cNick :: Maybe ByteString
+    , cLogHandle :: Handle
+    , cLogTime :: Bool
     }
 
-simplePlugin :: FromJSON a => (a -> PluginFunc) -> Value -> IO Plugin
-simplePlugin f v =
-    either error (\x -> return $ Plugin (f x) False) (parseEither parseJSON v)
+instance Default Config where
+  def = Config False "irc.r" "6667" Nothing stderr True
+
+instance FromJSON Config where
+  parseJSON = \case
+      Object v -> do
+        cServiceName <- v .:? "port" .!= cServiceName def
+        cUseTLS <- v .:? "useTLS" .!= (cServiceName == tlsPort)
+        cHostName <- v .:? "hostname" .!= cHostName def
+        cNick <- v .:? "nick"
+        cLogHandle <- pure (cLogHandle def)
+        cLogTime <- v .:? "logTime" .!= cLogTime def
+        pure Config{..}
+      _ -> undefined
+    where
+      tlsPort :: ServiceName
+      tlsPort = "6697"
 
 
-type Param = BS.ByteString
-type Command = BS.ByteString
-data Message = Message (Maybe Prefix) Command [Param]
+data Message = Message (Maybe ByteString) ByteString [ByteString] | Start
   deriving Show
+
+formatMessage :: Message -> ByteString
+formatMessage = \case
+    Message mb_prefix cmd params ->
+      maybe "" ((":"<>) . (<>" ")) mb_prefix
+          <> cmd
+          <> BS.concat (map (" "<>) (init params))
+          <> if null params then "" else " :" <> last params
+          <> "\r\n"
+    x -> error ("cannot format " <> show x)

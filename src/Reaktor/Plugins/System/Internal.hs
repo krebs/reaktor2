@@ -1,10 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Reaktor.Plugins.System.Internal where
 
-import           Data.Aeson
+import Prelude.Extended
+import Data.Aeson
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Map as M
-import           Reaktor.Internal ()
+import Reaktor ()
 
 
 -- TODO this needs better names :)
@@ -24,15 +25,18 @@ instance FromJSON Activate where
   parseJSON (String "query") = pure Query
   parseJSON _ = undefined
 
-data SystemConfig = SystemConfig {
-  defaultWorkDir :: Maybe FilePath,
+data Config = Config {
+  cDefaultWorkDir :: Maybe FilePath,
   -- TODO IrcCommand as key for map
-  hooks :: M.Map BS.ByteString [SystemParams]
+  cHooks :: M.Map BS.ByteString [SystemParams]
 }
 
-instance FromJSON SystemConfig where
+instance Default Config where
+  def = Config Nothing mempty
+
+instance FromJSON Config where
   parseJSON (Object v) =
-    SystemConfig
+    Config
       <$> v .:? "workdir"
       <*> v .:? "hooks" .!= M.empty
   parseJSON _ = pure undefined

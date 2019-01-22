@@ -1,65 +1,163 @@
-{-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Reaktor.Plugins.Register (plugin) where
+{-# LANGUAGE RecordWildCards #-}
+module Reaktor.Plugins.Register where
 
-import           Control.Monad (when)
-import           Data.Aeson
+import Blessings
+import Prelude.Extended
+import Data.Aeson
+import Data.ByteString.Char8.Extended (ByteString)
 import qualified Data.ByteString.Char8.Extended as BS
-import           GHC.Generics
-import           Reaktor.Internal
-import           Reaktor.Utils (nextNick,randomNick)
+import qualified Reaktor.Nick as Nick
+import Reaktor
+import System.Environment (lookupEnv)
 
-
-data RegisterConfig = RegisterConfig {
-      channels :: [BS.ByteString]
+data ConfigNickServ = ConfigNickServ
+    { cnsPassFile :: FilePath
+    , cnsPrefix :: ByteString
     }
-  deriving (FromJSON,Generic)
+instance FromJSON ConfigNickServ where
+  parseJSON = \case
+    Object v ->
+      ConfigNickServ
+        <$> v .: "passFile"
+        <*> v .:? "prefix" .!= "NickServ!NickServ@services."
+    _ -> undefined
 
+data Config = Config
+    { cNick :: Maybe ByteString
+    , cUser :: Maybe ByteString
+    , cReal :: ByteString
+    , cChannels :: [ByteString]
+    , cNickServ :: Maybe ConfigNickServ
+    }
+instance Default Config where
+  def = Config def def "reaktor2" def def
+instance FromJSON Config where
+  parseJSON = \case
+    Object v -> do
+      cNick <- v .:? "nick" .!= Nothing
+      cUser <- v .:? "user"
+      cReal <- v .:? "real" .!= cReal def
+      cChannels <- v .:? "channels" .!= []
+      cNickServ <- v .:? "NickServ" .!= cNickServ def
+      pure Config{..}
+    _ -> undefined
 
-plugin :: Value -> IO Plugin
-plugin = simplePlugin run
+new :: Config -> Actions -> IO (Message -> IO ())
+new Config{..} Actions{..} = do
+    let
+        isNickServEnabled = aIsSecure && isJust cNickServ
+        Just ConfigNickServ{..} = cNickServ
 
+        release nick pass = do
+          -- TODO Password type that doesn't get logged?
+          aLogMsg (privmsg "NickServ" ["RELEASE", nick, "<password>"])
+          aSendQuiet (privmsg "NickServ" ["RELEASE", nick, pass])
 
-run :: RegisterConfig -> PluginFunc
-run cfg msg = do
-    nick_ <- getNick
-    case msg of
+        channelsArg = BS.intercalate "," cChannels
+        -- TODO make this similar to privmsg (i.e. don't aSend)
+        join = do
+            -- TODO JOIN only if not already joined
+            --      i.e. not during subsequent nick changes
+            unless (BS.null channelsArg) $
+              aSend (Message Nothing "JOIN" [channelsArg])
 
-      Message _ "<start>" _ -> do
-        sendMsg (Message Nothing "NICK" [nick_])
-        sendMsg (Message Nothing "USER" [nick_, "*", "0", nick_])
+        start = do
+          nick <- maybe aGetNick pure cNick
+          user <-
+            maybe (maybe nick BS.pack <$> lookupEnv "LOGNAME") pure cUser
+          aSetNick nick
+          aSend (Message Nothing "NICK" [nick])
+          aSend (Message Nothing "USER" [user, "*", "0", cReal])
+        onNick newnick = do
+          nick <- aGetNick
+          when (newnick == nick) join
+        useRandomNick = do
+          nick <- Nick.getRandom
+          aSetNick nick
+          aSend (Message Nothing "NICK" [nick])
+        useNextNick = do
+          nick0 <- aGetNick
+          let nick = Nick.getNext nick0
+          aSetNick nick
+          aSend (Message Nothing "NICK" [nick])
+        useNextNickTemporarily = do
+          nick <- aGetNick
+          let tmpNick = Nick.getNext nick
+          -- do not aSetNick tmpNick 
+          aSend (Message Nothing "NICK" [tmpNick])
 
-      Message (Just _self) "NICK" (newnick:[]) -> do
-        when (newnick == nick_) $ do
-          -- TODO JOIN only if not already joined
-          --      i.e. not during subsequent nick changes
-          sendMsg (Message Nothing "JOIN" [ BS.intercalate "," (channels cfg) ])
+    if not isNickServEnabled then do
+      when (isJust cNickServ) $ do
+        aLog $ SGR [38,5,202] "! disabling NickServ due to insecure connection"
+      pure $ \case
+        Start -> start
+        Message (Just _self) "NICK" (newnick:[]) -> onNick newnick
+        Message _ "001" _ -> join
+        Message _ "432" _ -> useRandomNick
+        Message _ "433" _ -> useNextNick
+        Message _ "437" (_msgtarget:res:_reason:[]) -> do
+          nick <- aGetNick
+          when (res == nick) useNextNick
+        _ -> pure ()
 
-      -- RFC1459 ERR_NICKNAMEINUSE
-      Message (Just _servername) "433" (_msgtarget:nickinuse:_reason:[]) -> do
-        if nickinuse == nick_ then do
-          let nick' = nextNick nickinuse
-          sendMsg (Message Nothing "NICK" [nick'])
-          -- TODO change state on "NICK"
-          setNick nick'
+    else do
+      -- TODO do not fail, but disable NicServ
+      [pass] <- BS.lines <$> BS.readFile cnsPassFile
+      pure $ \case
+        Start -> start
+        Message (Just _self) "NICK" (newnick:[]) -> onNick newnick
 
-        -- TODO is this just for NickServ? (also check that module if it has
-        -- stuff only for "Register")
-        else do
-          nick' <- lift randomNick
-          sendMsg (Message Nothing "NICK" [nick'])
-          -- TODO set nick on "NICK" message
-          setNick nick'
+        -- RFC2812 RPL_WELCOME
+        Message _ "001" [msgtarget,_text] -> do
+          nick <- aGetNick
+          aLogMsg (privmsg "NickServ" ["IDENTIFY", nick, "<password>"])
+          aSendQuiet (privmsg "NickServ" ["IDENTIFY", nick, pass])
+          when (msgtarget /= nick) (release nick pass)
 
-      -- RFC2812 ERR_UNAVAILRESOURCE
-      --Message (Just _servername) "437" (_msgtarget:nickunavail:_reason:[]) -> do
+        -- TODO structured prefix, and check just for "NickServ"?
+        Message (Just prefix) "NOTICE" (msgtarget:text:[]) ->
+          when (prefix == cnsPrefix) $ do
+            nick <- aGetNick
+            let stx = ("\STX"<>) . (<>"\STX")
+            if
+              | text == "You are now identified for " <> stx nick <> "." -> do
+                -- XXX if msgtarget == nick then do
+                -- XXX   join
+                -- XXX else do
+                -- XXX   aSend (Message Nothing "NICK" [nick])
 
-      -- RFC2812 RPL_WELCOME
-      Message _ "001" [_nick,_s] -> do
-        --logStrLn $ SGR [32,1] (Plain s)
-        sendMsg (Message Nothing "JOIN" [ BS.intercalate "," (channels cfg) ])
+                -- otherwise join at NICK
+                when (msgtarget == nick) join
 
+              | text == stx nick <> " has been released." -> do
+                aSend (Message Nothing "NICK" [nick])
+              | text == "Invalid password for " <> stx nick <> "." -> do
+                -- TODO change nick + warning
+                error (BS.unpack text)
+              | text == stx nick <> " is not a registered nickname." -> do
+                -- TODO change nick + warning
+                error (BS.unpack text)
+              | otherwise ->
+                pure ()
 
-      _ -> return ()
+        -- RFC1459 ERR_ERRONEUSNICKNAME
+        Message (Just _servername) "432" (_msgtarget:_nick:_reason:[]) ->
+          useRandomNick
+
+        -- RFC1459 ERR_NICKNAMEINUSE
+        Message (Just _servername) "433" (_msgtarget:_nick:_reason:[]) ->
+          -- TODO what if nick0 /= nick? OR assert/prove nick0 == nick?
+          useNextNickTemporarily
+
+        --RFC2812 ERR_UNAVAILRESOURCE
+        Message (Just _servername) "437" (msgtarget:res:_reason:[]) -> do
+          nick <- aGetNick
+          when (res == nick) $
+            case msgtarget of
+              "*" -> useNextNickTemporarily
+              _ -> release nick pass
+
+        _ -> pure ()
