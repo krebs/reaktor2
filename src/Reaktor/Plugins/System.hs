@@ -5,23 +5,25 @@
 {-# LANGUAGE RecordWildCards #-}
 module Reaktor.Plugins.System (new) where
 
---import Prelude.Extended
 import Blessings
 import Control.Applicative
 import Control.Concurrent (forkIO)
-import Control.Exception (finally)
---import Data.Aeson
-import Data.ByteString.Char8.Extended (ByteString)
+import Control.Exception
 import qualified Data.ByteString.Char8.Extended as BS
-import qualified Data.Map as M
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Search as BS
+import qualified Data.HashMap.Lazy as M
+import qualified Data.List as L
+import qualified Data.Vector as V
+import Prelude.Extended
 import Reaktor
+import Reaktor.Plugins.System.Internal
 import System.Environment (getEnvironment)
+import System.Exit
 import System.FilePath.Posix (takeBaseName)
 import System.IO (BufferMode(LineBuffering),hSetBuffering)
 import System.IO (Handle,hClose,hPutStr,hIsEOF)
-import Reaktor.Plugins.System.Internal -- TODO rename to Reaktor.Plugins.System again
-import System.Process (StdStream(CreatePipe),waitForProcess)
-import System.Process (createProcess,CreateProcess(..),proc)
+import System.Process
 import qualified Text.Regex.PCRE.Heavy as RE
 import qualified Text.Regex.PCRE.Light as RE
 
@@ -29,28 +31,27 @@ import qualified Text.Regex.PCRE.Light as RE
 new :: Config -> Actions -> IO (Message -> IO ())
 new config@Config{..} actions@Actions{..} = do
     pure $ \case
-        Message (Just prefix) "PRIVMSG" (msgtarget:text:[]) -> do
-
-          nick_ <- aGetNick
-          let hs = maybe [] id (M.lookup "PRIVMSG" cHooks)
-          mapM_ (\h -> run1 config actions nick_ h prefix msgtarget text) hs
+        Message (Just prefix) cmd (msgtarget:text:[]) | elem cmd ["PRIVMSG", "JOIN"] -> do
+          let hooks = maybe [] id (M.lookup cmd cHooks)
+          mapM_ (\h -> run1 config actions h prefix msgtarget text) hooks
 
         Message (Just prefix) "JOIN" (channel:[]) -> do
-          nick_ <- aGetNick
-          let hs = maybe [] id (M.lookup "JOIN" cHooks)
-          mapM_ (\h -> run1 config actions nick_ h prefix channel "") hs
+          let hooks = maybe [] id (M.lookup "JOIN" cHooks)
+          mapM_ (\h -> run1 config actions h prefix channel "") hooks
 
         _ -> pure ()
 
 
-run1 :: Config -> Actions -> ByteString -> SystemParams -> ByteString -> ByteString -> ByteString -> IO ()
-run1 config@Config{..} actions@Actions{..} nick_ params prefix msgtarget text = do
+run1 :: Config -> Actions -> Hook -> ByteString -> ByteString -> ByteString -> IO ()
+run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
+    nick <- aGetNick
+
     let
         isActivated =
-          case activate params of
+          case hActivate of
             Always -> Just ""
             Match ->
-              case pattern params of
+              case hPattern of
                 Nothing -> Nothing
                 Just pat ->
                   let
@@ -62,8 +63,8 @@ run1 config@Config{..} actions@Actions{..} nick_ params prefix msgtarget text = 
                       else Just ""
             Query ->
               if
-                | BS.isPrefixOf (nick_ <> ":") text ->
-                  Just (nick_ <> ":")
+                | BS.isPrefixOf (nick <> ":") text ->
+                  Just (nick <> ":")
                 | BS.isPrefixOf "*:" text ->
                   Just "*:"
                 | isQuery ->
@@ -72,17 +73,16 @@ run1 config@Config{..} actions@Actions{..} nick_ params prefix msgtarget text = 
                   Nothing
 
         audience = if isQuery then from else msgtarget
+        from = BS.takeWhile (/='!') prefix
 
         -- TODO check if msgtarget is one of our channels?
         --      what if our nick has changed?
-        isQuery = msgtarget == nick_
-
-        from = BS.takeWhile (/='!') prefix
-          --maybe prefix (flip BS.take prefix) $ BS.findIndex (=='!') prefix
+        isQuery = msgtarget == nick
 
     case isActivated of
       Just trigger -> do
-        let cmdline = BS.dropWhile (==' ') $ BS.drop (BS.length trigger) text
+        let
+            cmdline = BS.dropWhile (==' ') $ BS.drop (BS.length trigger) text
             resultPrefix = if isQuery then [] else [from <> ":"]
 
             parseCommandLine' pat s =
@@ -91,106 +91,109 @@ run1 config@Config{..} actions@Actions{..} nick_ params prefix msgtarget text = 
                 result = RE.scan patternRE s
                 patternRE = RE.compile pat []
 
-            parse' =
-              case pattern params of
-                Nothing -> [] -- TODO everything
-                Just pat -> parseCommandLine' pat cmdline
+            captures =
+              V.fromList $
+                case hPattern of
+                  Nothing -> [] -- TODO everything?
+                  Just pat -> parseCommandLine' pat cmdline
 
-            headMaybe x = if null x then Nothing else Just (head x)
+            capture i = captures V.!? (i - 1)
 
-            -- TODO rename "command" to something like "commandSpec"
-            command' = case command params of
-              Capture i ->
-                case headMaybe (drop (fromIntegral i - 1) parse') of
-                  Nothing -> Nothing
-                  Just k -> M.lookup k (commands params)
+            name =
+              case hCommand of
+                Capture i -> fromMaybe "<unnamed>" (capture i)
+                CaptureOr Command{..} -> BS.pack $ takeBaseName $ commandPath
 
-              CaptureOr c -> Just c
+            command =
+              case hCommand of
+                Capture i -> (`M.lookup` hCommands) =<< capture i
+                CaptureOr c -> Just c
 
-            cmdName = case command params of
-              Capture i ->
-                case headMaybe (drop (fromIntegral i - 1) parse') of
-                  Nothing -> "<CMDERP>"
-                  Just k -> k
+            args =
+              map (maybe "" BS.unpack)
+                $ L.dropWhileEnd isNothing
+                -- $ map getArgument hArguments
+                $ flip map hArguments
+                $ \case
+                  Capture i -> capture i
+                  CaptureOr s -> Just s
 
-              CaptureOr c -> BS.pack (takeBaseName $ commandPath c)
+        case command of
+          Just Command{..} -> do
+            baseEnv <- getEnvironment
 
-            args' =
-                map BS.unpack $
-                map (maybe "" id) $
-                reverse $
-                dropWhile (==Nothing) $
-                reverse $
-                map f (arguments params)
-              where
-                f arg = case arg of
-                  Capture i ->
-                    case headMaybe (drop (fromIntegral i - 1) parse') of
-                      Nothing -> Nothing
-                      Just k -> Just k
+            let
+                onExit code = do
+                  let s = BS.show code
+                      (sig, col) =
+                        if code == ExitSuccess
+                          then (SGR [38,5,235] "* ", SGR [38,5,107])
+                          else (SGR [38,5,235] "! ", SGR [31,1])
+                  aLog $ sig <> col (Plain $ name <> ": " <> s)
 
-                  CaptureOr x -> Just x
+                onExcept :: SomeException -> IO ()
+                onExcept e = do
+                  let s0 = BS.show e
+                      s = BL.toStrict $ BS.replace (BS.pack commandPath) name s0
+                  aLog $ SGR [38,5,235] "! "
+                      <> SGR [31,1] (Plain $ name <> ": " <> s0)
+                  aSend (privmsg audience (resultPrefix <> [s]))
 
-        case command' of
-          Just c -> do
-            -- aSend <- gets s_sendMsg
-            -- putLog_ <- gets s_putLog
-            let onErrLine s =
-                  aLog $ SGR [31,1] $
-                    Plain (BS.pack (takeBaseName $ commandPath c) <> ": "<> s)
+                -- TODO use differenct colors
+                onErrLine s = aSend (privmsg audience [s])
+                onOutLine s = aSend (privmsg audience [s])
 
-                onOutLine s =
-                  aSend (privmsg audience [s])
+                extraEnv =
+                    [ ("_prefix", BS.unpack prefix)
+                    , ("_from", BS.unpack from)
+                    ]
 
-                extraEnv = [("_prefix", BS.unpack prefix),
-                            ("_from", BS.unpack from)]
+                env =
+                  M.toList $ mconcat
+                    [ M.fromList extraEnv
+                    , maybe mempty id commandEnv
+                    , M.fromList baseEnv
+                    ]
 
-            fork config actions c args' (Just extraEnv) "" onOutLine onErrLine
+                cwd = commandWorkDir <|> hWorkDir <|> cWorkDir
+
+            fork commandPath args cwd (Just env) "" onOutLine onErrLine onExit
+              `catch` onExcept
 
           Nothing -> do
-            aSend (privmsg audience (resultPrefix <> [cmdName <> ": command not found"]))
+            let s = name <> ": command not found"
+            aSend (privmsg audience (resultPrefix <> [s]))
 
       Nothing -> return ()
 
-fork :: Config
-     -> Actions
-     -> SystemCommand
+fork :: FilePath
      -> [String]
+     -> Maybe FilePath
      -> Maybe [(String, String)]
      -> String
      -> (ByteString -> IO ())
      -> (ByteString -> IO ())
+     -> (ExitCode -> IO ())
      -> IO ()
-fork Config{..} Actions{..} cmd args extraEnv input onOutLine onErrLine = do
-
-    baseEnv <- getEnvironment
-
-    let procEnv = M.toList $ mconcat [
-                    maybe mempty M.fromList extraEnv,
-                    maybe mempty id (commandEnv cmd),
-                    M.fromList baseEnv
-                  ]
-
-    (inh, outh, errh) <- do
-      (Just inh, Just outh, Just errh, ph) <-
-        createProcess (proc (commandPath cmd) args) {
-          cwd = commandWorkDir cmd <|> cDefaultWorkDir,
-          env = Just procEnv,
-          std_in = CreatePipe,
-          std_out = CreatePipe,
-          std_err = CreatePipe,
-          close_fds = True,
-          create_group = True,
-          new_session = True
-        }
-      _ <- forkIO $ waitForProcess ph >> return ()
-      return (inh, outh, errh)
-
-    mapM_ forkIO [
-        hPutStr inh input `finally` hClose inh,
-        hWithLines outh onOutLine,
-        hWithLines errh onErrLine
-      ]
+fork path args cwd env input onOutLine onErrLine onExit = do
+    let
+        p = (proc path args)
+              { cwd = cwd
+              , env = env
+              , std_in = CreatePipe
+              , std_out = CreatePipe
+              , std_err = CreatePipe
+              , close_fds = True
+              , create_group = True
+              , new_session = True
+              }
+    withCreateProcess p $ \(Just inh) (Just outh) (Just errh) ph -> do
+      mapM_ forkIO [
+          hPutStr inh input `finally` hClose inh,
+          hWithLines outh onOutLine,
+          hWithLines errh onErrLine
+        ]
+      waitForProcess ph >>= onExit
 
 
 hWithLines :: Handle -> (ByteString -> IO ()) -> IO ()

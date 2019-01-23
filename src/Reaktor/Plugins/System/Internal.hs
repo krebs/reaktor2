@@ -1,15 +1,15 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Reaktor.Plugins.System.Internal where
 
 import Prelude.Extended
 import Data.Aeson
-import qualified Data.ByteString.Char8.Extended as BS
-import qualified Data.Map as M
 import Reaktor ()
 
 
+
 -- TODO this needs better names :)
-data CaptureOr a = Capture Integer | CaptureOr a
+data CaptureOr a = Capture Int | CaptureOr a
   deriving Show -- TODO killme
 
 instance FromJSON a => FromJSON (CaptureOr a) where
@@ -20,60 +20,63 @@ instance FromJSON a => FromJSON (CaptureOr a) where
 data Activate = Always | Match | Query
 
 instance FromJSON Activate where
-  parseJSON (String "always") = pure Always
-  parseJSON (String "match") = pure Match
-  parseJSON (String "query") = pure Query
-  parseJSON _ = undefined
+  parseJSON = \case
+      String "always" -> pure Always
+      String "match" -> pure Match
+      String "query" -> pure Query
+      _ -> undefined
 
-data Config = Config {
-  cDefaultWorkDir :: Maybe FilePath,
-  -- TODO IrcCommand as key for map
-  cHooks :: M.Map BS.ByteString [SystemParams]
-}
+data Config = Config
+    { cWorkDir :: Maybe FilePath
+    , cHooks :: HashMap ByteString [Hook]
+    }
 
 instance Default Config where
   def = Config Nothing mempty
 
 instance FromJSON Config where
-  parseJSON (Object v) =
-    Config
-      <$> v .:? "workdir"
-      <*> v .:? "hooks" .!= M.empty
-  parseJSON _ = pure undefined
+  parseJSON = \case
+      Object v ->
+        Config
+          <$> v .:? "workdir"
+          <*> v .:? "hooks" .!= mempty
+      _ -> undefined
 
-data SystemParams = SystemParams {
-  activate :: Activate,
-  pattern :: Maybe BS.ByteString, -- TODO RE
-  command :: CaptureOr SystemCommand,
-  arguments :: [CaptureOr BS.ByteString],
-  workDir :: Maybe FilePath,
-  commands :: M.Map BS.ByteString SystemCommand
-}
+data Hook = Hook
+    { hActivate :: Activate
+    , hPattern :: Maybe ByteString
+    , hCommand :: CaptureOr Command
+    , hArguments :: [CaptureOr ByteString]
+    , hWorkDir :: Maybe FilePath
+    , hCommands :: HashMap ByteString Command
+    }
 
-instance FromJSON SystemParams where
-  parseJSON (Object v) =
-      SystemParams
-        <$> v .:? "activate" .!= Query
-        <*> v .:? "pattern"
-        <*> v .: "command"
-        <*> v .:? "arguments" .!= []
-        <*> v .:? "workdir"
-        <*> v .:? "commands" .!= M.empty
-  parseJSON _ = pure undefined
+instance FromJSON Hook where
+  parseJSON = \case
+      Object v ->
+        Hook
+          <$> v .:? "activate" .!= Query
+          <*> v .:? "pattern"
+          <*> v .: "command"
+          <*> v .:? "arguments" .!= []
+          <*> v .:? "workdir"
+          <*> v .:? "commands" .!= mempty
+      _ -> undefined
 
 
-data SystemCommand = SystemCommand {
-    commandPath :: FilePath,
-    commandWorkDir :: Maybe FilePath,
-    commandEnv :: Maybe (M.Map String String)
-  }
-  deriving Show -- TODO killme
+data Command = Command
+    { commandPath :: FilePath
+    , commandWorkDir :: Maybe FilePath
+    , commandEnv :: Maybe (HashMap String String)
+    }
+  deriving Show
 
-instance FromJSON SystemCommand where
-  parseJSON (Object v) =
-      SystemCommand
-        <$> v .: "filename"
-        <*> v .:? "workdir"
-        <*> v .:? "env"
-  parseJSON _ = pure undefined
+instance FromJSON Command where
+  parseJSON = \case
+      Object v ->
+        Command
+          <$> v .: "filename"
+          <*> v .:? "workdir"
+          <*> v .:? "env"
+      _ -> undefined
 

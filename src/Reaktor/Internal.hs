@@ -3,11 +3,10 @@
 {-# LANGUAGE RecordWildCards #-}
 module Reaktor.Internal where
 
+import Prelude.Extended
 import Blessings
 import Data.Aeson
-import Data.ByteString (ByteString)
 import Network.Socket as Exports (HostName,ServiceName)
-import Prelude.Extended
 import qualified Data.ByteString.Char8.Extended as BS
 import System.IO
 
