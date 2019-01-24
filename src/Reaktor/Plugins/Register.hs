@@ -52,9 +52,7 @@ new Config{..} Actions{..} = do
         Just ConfigNickServ{..} = cNickServ
 
         release nick pass = do
-          -- TODO Password type that doesn't get logged?
-          aLogMsg (privmsg "NickServ" ["RELEASE", nick, "<password>"])
-          aSendQuiet (privmsg "NickServ" ["RELEASE", nick, pass])
+          aSend (privmsg "NickServ" ["RELEASE", nick, pass])
 
         channelsArg = BS.intercalate "," cChannels
         -- TODO make this similar to privmsg (i.e. don't aSend)
@@ -113,8 +111,7 @@ new Config{..} Actions{..} = do
         -- RFC2812 RPL_WELCOME
         Message _ "001" [msgtarget,_text] -> do
           nick <- aGetNick
-          aLogMsg (privmsg "NickServ" ["IDENTIFY", nick, "<password>"])
-          aSendQuiet (privmsg "NickServ" ["IDENTIFY", nick, pass])
+          aSend (privmsg "NickServ" ["IDENTIFY", nick, pass])
           when (msgtarget /= nick) (release nick pass)
 
         -- TODO structured prefix, and check just for "NickServ"?
@@ -124,22 +121,20 @@ new Config{..} Actions{..} = do
             let stx = ("\STX"<>) . (<>"\STX")
             if
               | text == "You are now identified for " <> stx nick <> "." -> do
-                -- XXX if msgtarget == nick then do
-                -- XXX   join
-                -- XXX else do
-                -- XXX   aSend (Message Nothing "NICK" [nick])
-
                 -- otherwise join at NICK
                 when (msgtarget == nick) join
 
               | text == stx nick <> " has been released." -> do
                 aSend (Message Nothing "NICK" [nick])
+
               | text == "Invalid password for " <> stx nick <> "." -> do
-                -- TODO change nick + warning
-                error (BS.unpack text)
+                -- TODO warning
+                when (msgtarget == nick) join
+
               | text == stx nick <> " is not a registered nickname." -> do
-                -- TODO change nick + warning
-                error (BS.unpack text)
+                -- TODO warning
+                when (msgtarget == nick) join
+
               | otherwise ->
                 pure ()
 

@@ -10,9 +10,10 @@ module Reaktor
 import Blessings
 import Control.Concurrent.Extended
 import Control.Exception
-import Data.Attoparsec.ByteString.Char8
+import Data.Attoparsec.ByteString.Char8 (feed,parse)
+import Data.Attoparsec.ByteString.Char8 (IResult(Done,Fail,Partial))
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Char8.Extended as BS
 import Data.Foldable (toList)
 import Data.Time.Clock.System
 import Data.Time.Format
@@ -61,11 +62,14 @@ run Config{..} getPlugins =
       let actions = Actions{..}
           aIsSecure = cUseTLS
           aLog = putLog
-          aLogMsg msg = do
-              let bs = formatMessage msg
-              putLog $ SGR [38,5,235] "> " <> SGR [35,1] (Plain bs)
-          aSendQuiet = putOutMsg
-          aSend msg = aLogMsg msg >> aSendQuiet msg
+          aSend msg = logMsg msg >> putOutMsg msg
+
+          logMsg msg =
+              case logMsgFilter msg of
+                Just msg' -> do
+                  let bs = formatMessage msg'
+                  aLog $ SGR [38,5,235] "> " <> SGR [35,1] (Plain bs)
+                Nothing -> return ()
 
       mapM_ (\(s, f) -> installHandler s (Catch f) Nothing) [
           (sigINT, shutdown)
@@ -107,8 +111,7 @@ receiver Actions{..} putInMsg sockRecv =
   where
     receive "" =
         sockRecv >>= \case
-          Nothing -> do
-            aLog $ SGR [34,1] (Plain "# EOL")
+          Nothing -> logErr "EOL"
           Just buf -> receive buf
 
     receive buf =
@@ -117,21 +120,27 @@ receiver Actions{..} putInMsg sockRecv =
         go :: IResult ByteString Message -> IO ()
         go = \case
             Done rest msg -> do
-              -- TODO log message only if h hasn't disabled logging for it
-              let bs = formatMessage msg
-              aLog $ SGR [38,5,235] "< " <> SGR [38,5,244] (Plain bs)
+              logMsg msg
               putInMsg msg
               receive rest
 
-            p@(Partial _) -> do
+            p@(Partial _) ->
               sockRecv >>= \case
-                Nothing -> do
-                  aLog $ SGR [31] (Plain "EOF")
-                Just msg ->
-                  go (feed p msg)
+                Nothing -> logErr ("EOF with partial " <> Plain (BS.show p))
+                Just msg -> go (feed p msg)
 
-            f@(Fail _i _errorContexts _errMessage) -> do
-              aLog $ SGR [31,1] (Plain (BS.pack $ show f))
+            f@(Fail _i _errorContexts _errMessage) ->
+              logErr ("failed to parse message: " <> Plain (BS.show f))
+
+    logErr s = aLog $ SGR [31,1] ("! receive: " <> s)
+
+    logMsg msg =
+        case logMsgFilter msg of
+          Just msg' -> do
+            let bs = formatMessage msg'
+            aLog $ SGR [38,5,235] "< " <> SGR [38,5,244] (Plain bs)
+          Nothing -> return ()
+
 
 sender :: IO Message -> (ByteString -> IO ()) -> IO ()
 sender takeOutMsg sockSend =
@@ -142,6 +151,21 @@ splitter plugins takeInMsg =
     forever $ do
       msg <- takeInMsg
       mapM_ (\f -> forkIO (f msg)) plugins
+
+
+logMsgFilter :: Message -> Maybe Message
+logMsgFilter = \case
+    Message _ "PING" _ -> Nothing
+    Message _ "PONG" _ -> Nothing
+    Message p "PRIVMSG" ["NickServ",xs] | check -> do
+        Just (Message p "PRIVMSG" ["NickServ",xs'])
+      where
+        check = elem cmd ["IDENTIFY","RELEASE"] && length ws > 2
+        ws = BS.words xs
+        (cmd:ws') = ws
+        (nick:_) = ws'
+        xs' = BS.unwords [cmd, nick, "<password>"]
+    msg -> Just msg
 
 
 privmsg :: ByteString -> [ByteString] -> Message

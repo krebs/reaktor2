@@ -15,10 +15,7 @@ data Actions = Actions
     { aIsSecure :: Bool
 
     , aSend :: Message -> IO ()
-    , aSendQuiet :: Message -> IO ()
-
     , aLog :: Blessings ByteString -> IO ()
-    , aLogMsg :: Message -> IO ()
 
     , aSetNick :: ByteString -> IO ()
     , aGetNick :: IO ByteString
