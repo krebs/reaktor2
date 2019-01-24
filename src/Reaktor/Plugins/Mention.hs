@@ -4,8 +4,8 @@
 module Reaktor.Plugins.Mention (new) where
 
 import Prelude.Extended
-import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Char
+import qualified Data.Text as T
 import Reaktor
 
 
@@ -19,5 +19,5 @@ new Actions{..} = do
       _ -> return ()
   where
     isMention nick text =
-      not (BS.isPrefixOf (nick <> ":") text) &&
-      any (==nick) (BS.splitWith (not . Data.Char.isAlphaNum) text)
+      not (T.isPrefixOf (nick <> ":") text) &&
+      any (==nick) (T.split (not . Data.Char.isAlphaNum) text)

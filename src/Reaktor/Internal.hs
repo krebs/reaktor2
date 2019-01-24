@@ -6,8 +6,8 @@ module Reaktor.Internal where
 import Prelude.Extended
 import Blessings
 import Data.Aeson
+import qualified Data.Text as T
 import Network.Socket as Exports (HostName,ServiceName)
-import qualified Data.ByteString.Char8.Extended as BS
 import System.IO
 
 
@@ -15,10 +15,10 @@ data Actions = Actions
     { aIsSecure :: Bool
 
     , aSend :: Message -> IO ()
-    , aLog :: Blessings ByteString -> IO ()
+    , aLog :: Blessings Text -> IO ()
 
-    , aSetNick :: ByteString -> IO ()
-    , aGetNick :: IO ByteString
+    , aSetNick :: Text -> IO ()
+    , aGetNick :: IO Text
     }
 
 
@@ -26,10 +26,11 @@ data Config = Config
     { cUseTLS :: Bool
     , cHostName :: HostName
     , cServiceName :: ServiceName
-    , cNick :: Maybe ByteString
+    , cNick :: Maybe Text
     , cLogHandle :: Handle
     , cLogTime :: Bool
     }
+  deriving Show
 
 instance Default Config where
   def = Config False "irc.r" "6667" Nothing stderr True
@@ -50,15 +51,15 @@ instance FromJSON Config where
       tlsPort = "6697"
 
 
-data Message = Message (Maybe ByteString) ByteString [ByteString] | Start
+data Message = Message (Maybe Text) Text [Text] | Start
   deriving Show
 
-formatMessage :: Message -> ByteString
+formatMessage :: Message -> Text
 formatMessage = \case
     Message mb_prefix cmd params ->
       maybe "" ((":"<>) . (<>" ")) mb_prefix
           <> cmd
-          <> BS.concat (map (" "<>) (init params))
+          <> T.concat (map (" "<>) (init params))
           <> if null params then "" else " :" <> last params
           <> "\r\n"
     x -> error ("cannot format " <> show x)

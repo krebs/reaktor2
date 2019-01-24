@@ -18,6 +18,7 @@ instance FromJSON a => FromJSON (CaptureOr a) where
 
 -- TODO query means via direct privmsg and <nick>:
 data Activate = Always | Match | Query
+  deriving Show
 
 instance FromJSON Activate where
   parseJSON = \case
@@ -28,8 +29,9 @@ instance FromJSON Activate where
 
 data Config = Config
     { cWorkDir :: Maybe FilePath
-    , cHooks :: HashMap ByteString [Hook]
+    , cHooks :: HashMap Text [Hook]
     }
+  deriving Show
 
 instance Default Config where
   def = Config Nothing mempty
@@ -46,10 +48,11 @@ data Hook = Hook
     { hActivate :: Activate
     , hPattern :: Maybe ByteString
     , hCommand :: CaptureOr Command
-    , hArguments :: [CaptureOr ByteString]
+    , hArguments :: [CaptureOr Text]
     , hWorkDir :: Maybe FilePath
-    , hCommands :: HashMap ByteString Command
+    , hCommands :: HashMap Text Command
     }
+  deriving Show
 
 instance FromJSON Hook where
   parseJSON = \case

@@ -1,30 +1,31 @@
 module Reaktor.Nick where
 
-import Data.ByteString.Char8.Extended (ByteString)
-import qualified Data.ByteString.Char8.Extended as BS
-import           Data.Char (chr)
-import           Data.Char (isDigit)
-import           System.Random (getStdRandom, randomR)
+import Data.Char (chr)
+import Data.Char (isDigit)
+import qualified Data.Text as T
+import qualified Data.Text.Read as T (decimal)
+import Prelude.Extended
+import System.Random (getStdRandom, randomR)
 
 
-getNext :: ByteString -> ByteString
+getNext :: Text -> Text
 getNext nick_ = nick'
   where
+    splitNick :: Text -> (Text, Int)
     splitNick s =
-           (prefix, maybe 0 fst (BS.readInt suffix))
+           (prefix, either (const 0) fst (T.decimal suffix))
          where
-           prefix = BS.take (BS.length s - BS.length suffix) s
-           suffix = BS.reverse . BS.takeWhile isDigit . BS.reverse $ s
+           prefix = T.take (T.length s - T.length suffix) s
+           suffix = T.reverse . T.takeWhile isDigit . T.reverse $ s
     (nickPrefix, nickSuffix) = splitNick nick_
-    nick' = nickPrefix <> (BS.pack . show $ nickSuffix + 1)
+    nick' = nickPrefix <> (T.pack . show $ nickSuffix + 1)
 
-
-getRandom :: IO ByteString
+getRandom :: IO Text
 getRandom = do
     h_chr <- getRandomChar nickhead
     t_len <- getStdRandom (randomR (4,8)) :: IO Int
     t_str <- mapM (const $ getRandomChar nicktail) [1..t_len]
-    return $ BS.pack (h_chr:t_str)
+    return $ T.pack (h_chr:t_str)
   where
     getRandomChar cs = (cs!!) <$> getStdRandom (randomR (0, length cs - 1))
 

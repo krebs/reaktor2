@@ -10,10 +10,12 @@ module Reaktor
 import Blessings
 import Control.Concurrent.Extended
 import Control.Exception
-import Data.Attoparsec.ByteString.Char8 (feed,parse)
-import Data.Attoparsec.ByteString.Char8 (IResult(Done,Fail,Partial))
+import Data.Attoparsec.Text (feed,parse)
+import Data.Attoparsec.Text (IResult(Done,Fail,Partial))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8.Extended as BS
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.Extended as T
 import Data.Foldable (toList)
 import Data.Time.Clock.System
 import Data.Time.Format
@@ -92,11 +94,11 @@ run Config{..} getPlugins =
       putStrLn ""
 
 
-logger :: System.IO.Handle -> IO (Blessings ByteString) -> IO ()
+logger :: System.IO.Handle -> IO (Blessings Text) -> IO ()
 logger h takeLog = forever $ do
     s <- takeLog
     let s' = if lastChar s == '\n' then s else s <> Plain "\n"
-    System.IO.hPutStr h $ pp $ fmap BS.unpack s'
+    System.IO.hPutStr h $ pp $ fmap T.unpack s'
 
 pinger :: (Message -> IO ()) -> IO ()
 pinger aSend = forever $ do
@@ -109,15 +111,19 @@ receiver :: Actions -> (Message -> IO ()) -> IO (Maybe ByteString) -> IO ()
 receiver Actions{..} putInMsg sockRecv =
     receive ""
   where
+    decode :: ByteString -> Text
+    decode = T.decodeUtf8With (\_err _c -> Just '?')
+
+    receive :: Text -> IO ()
     receive "" =
         sockRecv >>= \case
           Nothing -> logErr "EOL"
-          Just buf -> receive buf
+          Just buf -> receive (decode buf)
 
     receive buf =
         go (parse Parser.message buf)
       where
-        go :: IResult ByteString Message -> IO ()
+        go :: IResult Text Message -> IO ()
         go = \case
             Done rest msg -> do
               logMsg msg
@@ -126,11 +132,11 @@ receiver Actions{..} putInMsg sockRecv =
 
             p@(Partial _) ->
               sockRecv >>= \case
-                Nothing -> logErr ("EOF with partial " <> Plain (BS.show p))
-                Just msg -> go (feed p msg)
+                Nothing -> logErr ("EOF with partial " <> Plain (T.show p))
+                Just buf' -> go (feed p (decode buf'))
 
             f@(Fail _i _errorContexts _errMessage) ->
-              logErr ("failed to parse message: " <> Plain (BS.show f))
+              logErr ("failed to parse message: " <> Plain (T.show f))
 
     logErr s = aLog $ SGR [31,1] ("! receive: " <> s)
 
@@ -144,7 +150,7 @@ receiver Actions{..} putInMsg sockRecv =
 
 sender :: IO Message -> (ByteString -> IO ()) -> IO ()
 sender takeOutMsg sockSend =
-    forever $ takeOutMsg >>= sockSend . formatMessage
+    forever $ takeOutMsg >>= sockSend . T.encodeUtf8 . formatMessage
 
 splitter :: [Message -> IO ()] -> IO Message -> IO ()
 splitter plugins takeInMsg =
@@ -161,24 +167,24 @@ logMsgFilter = \case
         Just (Message p "PRIVMSG" ["NickServ",xs'])
       where
         check = elem cmd ["IDENTIFY","REGAIN"] && length ws > 2
-        ws = BS.words xs
+        ws = T.words xs
         (cmd:ws') = ws
         (nick:_) = ws'
-        xs' = BS.unwords [cmd, nick, "<password>"]
+        xs' = T.unwords [cmd, nick, "<password>"]
     msg -> Just msg
 
 
-privmsg :: ByteString -> [ByteString] -> Message
+privmsg :: Text -> [Text] -> Message
 privmsg msgtarget xs =
-    Message Nothing "PRIVMSG" (msgtarget:BS.intercalate " " xs:[])
+    Message Nothing "PRIVMSG" (msgtarget:T.intercalate " " xs:[])
 
 
-lastChar :: Blessings ByteString -> Char
-lastChar = BS.last . last . toList
+lastChar :: Blessings Text -> Char
+lastChar = T.last . last . toList
 
-prefixTimestamp :: Blessings ByteString -> IO (Blessings ByteString)
+prefixTimestamp :: Blessings Text -> IO (Blessings Text)
 prefixTimestamp s = do
-    t <- SGR [38,5,239] . Plain . BS.pack <$> getTimestamp
+    t <- SGR [38,5,239] . Plain . T.pack <$> getTimestamp
     return (t <> " " <> s)
 
 stripSGR :: Blessings a -> Blessings a

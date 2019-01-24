@@ -9,11 +9,10 @@ import Blessings
 import Control.Applicative
 import Control.Concurrent (forkIO)
 import Control.Exception
-import qualified Data.ByteString.Char8.Extended as BS
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.ByteString.Search as BS
 import qualified Data.HashMap.Lazy as M
 import qualified Data.List as L
+import qualified Data.Text.Extended as T
+import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import Prelude.Extended
 import Reaktor
@@ -42,7 +41,7 @@ new config@Config{..} actions@Actions{..} = do
         _ -> pure ()
 
 
-run1 :: Config -> Actions -> Hook -> ByteString -> ByteString -> ByteString -> IO ()
+run1 :: Config -> Actions -> Hook -> Text -> Text -> Text -> IO ()
 run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
     nick <- aGetNick
 
@@ -56,16 +55,16 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 Just pat ->
                   let
                       result = RE.scan patternRE text
-                      patternRE = RE.compile pat []
+                      patternRE = RE.compile pat [RE.utf8]
                   in
                     if null result
                       then Nothing
                       else Just ""
             Query ->
               if
-                | BS.isPrefixOf (nick <> ":") text ->
+                | T.isPrefixOf (nick <> ":") text ->
                   Just (nick <> ":")
-                | BS.isPrefixOf "*:" text ->
+                | T.isPrefixOf "*:" text ->
                   Just "*:"
                 | isQuery ->
                   Just ""
@@ -73,7 +72,8 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                   Nothing
 
         audience = if isQuery then from else msgtarget
-        from = BS.takeWhile (/='!') prefix
+
+        from = T.takeWhile (/='!') prefix
 
         -- TODO check if msgtarget is one of our channels?
         --      what if our nick has changed?
@@ -82,14 +82,14 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
     case isActivated of
       Just trigger -> do
         let
-            cmdline = BS.dropWhile (==' ') $ BS.drop (BS.length trigger) text
+            cmdline = T.dropWhile (==' ') $ T.drop (T.length trigger) text
             resultPrefix = if isQuery then [] else [from <> ":"]
 
             parseCommandLine' pat s =
                 if null result then [] else snd (head result)
               where
                 result = RE.scan patternRE s
-                patternRE = RE.compile pat []
+                patternRE = RE.compile pat [RE.utf8]
 
             captures =
               V.fromList $
@@ -102,7 +102,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
             name =
               case hCommand of
                 Capture i -> fromMaybe "<unnamed>" (capture i)
-                CaptureOr Command{..} -> BS.pack $ takeBaseName $ commandPath
+                CaptureOr Command{..} -> T.pack $ takeBaseName $ commandPath
 
             command =
               case hCommand of
@@ -110,7 +110,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 CaptureOr c -> Just c
 
             args =
-              map (maybe "" BS.unpack)
+              map (maybe "" T.unpack)
                 $ L.dropWhileEnd isNothing
                 -- $ map getArgument hArguments
                 $ flip map hArguments
@@ -124,7 +124,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
 
             let
                 onExit code = do
-                  let s = BS.show code
+                  let s = T.show code
                       (sig, col) =
                         if code == ExitSuccess
                           then (SGR [38,5,235] "* ", SGR [38,5,107])
@@ -133,8 +133,8 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
 
                 onExcept :: SomeException -> IO ()
                 onExcept e = do
-                  let s0 = BS.show e
-                      s = BL.toStrict $ BS.replace (BS.pack commandPath) name s0
+                  let s0 = T.show e
+                      s = T.replace (T.pack commandPath) name s0
                   aLog $ SGR [38,5,235] "! "
                       <> SGR [31,1] (Plain $ name <> ": " <> s0)
                   aSend (privmsg audience (resultPrefix <> [s]))
@@ -144,8 +144,8 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 onOutLine s = aSend (privmsg audience [s])
 
                 extraEnv =
-                    [ ("_prefix", BS.unpack prefix)
-                    , ("_from", BS.unpack from)
+                    [ ("_prefix", T.unpack prefix)
+                    , ("_from", T.unpack from)
                     ]
 
                 env =
@@ -171,8 +171,8 @@ fork :: FilePath
      -> Maybe FilePath
      -> Maybe [(String, String)]
      -> String
-     -> (ByteString -> IO ())
-     -> (ByteString -> IO ())
+     -> (Text -> IO ())
+     -> (Text -> IO ())
      -> (ExitCode -> IO ())
      -> IO ()
 fork path args cwd env input onOutLine onErrLine onExit = do
@@ -196,7 +196,7 @@ fork path args cwd env input onOutLine onErrLine onExit = do
       waitForProcess ph >>= onExit
 
 
-hWithLines :: Handle -> (ByteString -> IO ()) -> IO ()
+hWithLines :: Handle -> (Text -> IO ()) -> IO ()
 hWithLines h f = do
     hSetBuffering h LineBuffering
     go `finally` hClose h
@@ -204,4 +204,4 @@ hWithLines h f = do
     go =
       hIsEOF h >>= \case
         True -> return ()
-        False -> BS.hGetLine h >>= f >> go
+        False -> T.hGetLine h >>= f >> go

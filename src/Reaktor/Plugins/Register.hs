@@ -7,15 +7,15 @@ module Reaktor.Plugins.Register where
 import Blessings
 import Prelude.Extended
 import Data.Aeson
-import Data.ByteString.Char8.Extended (ByteString)
-import qualified Data.ByteString.Char8.Extended as BS
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import qualified Reaktor.Nick as Nick
 import Reaktor
 import System.Environment (lookupEnv)
 
 data ConfigNickServ = ConfigNickServ
     { cnsPassFile :: FilePath
-    , cnsPrefix :: ByteString
+    , cnsPrefix :: Text
     }
 instance FromJSON ConfigNickServ where
   parseJSON = \case
@@ -26,10 +26,10 @@ instance FromJSON ConfigNickServ where
     _ -> undefined
 
 data Config = Config
-    { cNick :: Maybe ByteString
-    , cUser :: Maybe ByteString
-    , cReal :: ByteString
-    , cChannels :: [ByteString]
+    { cNick :: Maybe Text
+    , cUser :: Maybe Text
+    , cReal :: Text
+    , cChannels :: [Text]
     , cNickServ :: Maybe ConfigNickServ
     }
 instance Default Config where
@@ -54,18 +54,18 @@ new Config{..} Actions{..} = do
         regain nick pass = do
           aSend (privmsg "NickServ" ["REGAIN", nick, pass])
 
-        channelsArg = BS.intercalate "," cChannels
+        channelsArg = T.intercalate "," cChannels
         -- TODO make this similar to privmsg (i.e. don't aSend)
         join = do
             -- TODO JOIN only if not already joined
             --      i.e. not during subsequent nick changes
-            unless (BS.null channelsArg) $
+            unless (T.null channelsArg) $
               aSend (Message Nothing "JOIN" [channelsArg])
 
         start = do
           nick <- maybe aGetNick pure cNick
           user <-
-            maybe (maybe nick BS.pack <$> lookupEnv "LOGNAME") pure cUser
+            maybe (maybe nick T.pack <$> lookupEnv "LOGNAME") pure cUser
           aSetNick nick
           aSend (Message Nothing "NICK" [nick])
           aSend (Message Nothing "USER" [user, "*", "0", cReal])
@@ -103,7 +103,7 @@ new Config{..} Actions{..} = do
 
     else do
       -- TODO do not fail, but disable NicServ
-      [pass] <- BS.lines <$> BS.readFile cnsPassFile
+      [pass] <- T.lines <$> T.readFile cnsPassFile
       pure $ \case
         Start -> start
         Message (Just _self) "NICK" (newnick:[]) -> onNick newnick
