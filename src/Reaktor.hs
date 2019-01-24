@@ -160,7 +160,7 @@ logMsgFilter = \case
     Message p "PRIVMSG" ["NickServ",xs] | check -> do
         Just (Message p "PRIVMSG" ["NickServ",xs'])
       where
-        check = elem cmd ["IDENTIFY","RELEASE"] && length ws > 2
+        check = elem cmd ["IDENTIFY","REGAIN"] && length ws > 2
         ws = BS.words xs
         (cmd:ws') = ws
         (nick:_) = ws'

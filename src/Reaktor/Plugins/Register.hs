@@ -51,8 +51,8 @@ new Config{..} Actions{..} = do
         isNickServEnabled = aIsSecure && isJust cNickServ
         Just ConfigNickServ{..} = cNickServ
 
-        release nick pass = do
-          aSend (privmsg "NickServ" ["RELEASE", nick, pass])
+        regain nick pass = do
+          aSend (privmsg "NickServ" ["REGAIN", nick, pass])
 
         channelsArg = BS.intercalate "," cChannels
         -- TODO make this similar to privmsg (i.e. don't aSend)
@@ -112,7 +112,7 @@ new Config{..} Actions{..} = do
         Message _ "001" [msgtarget,_text] -> do
           nick <- aGetNick
           aSend (privmsg "NickServ" ["IDENTIFY", nick, pass])
-          when (msgtarget /= nick) (release nick pass)
+          when (msgtarget /= nick) (regain nick pass)
 
         -- TODO structured prefix, and check just for "NickServ"?
         Message (Just prefix) "NOTICE" (msgtarget:text:[]) ->
@@ -123,9 +123,6 @@ new Config{..} Actions{..} = do
               | text == "You are now identified for " <> stx nick <> "." -> do
                 -- otherwise join at NICK
                 when (msgtarget == nick) join
-
-              | text == stx nick <> " has been released." -> do
-                aSend (Message Nothing "NICK" [nick])
 
               | text == "Invalid password for " <> stx nick <> "." -> do
                 -- TODO warning
@@ -153,6 +150,6 @@ new Config{..} Actions{..} = do
           when (res == nick) $
             case msgtarget of
               "*" -> useNextNickTemporarily
-              _ -> release nick pass
+              _ -> regain nick pass
 
         _ -> pure ()
