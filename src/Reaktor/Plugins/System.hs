@@ -134,13 +134,14 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 onExcept :: SomeException -> IO ()
                 onExcept e = do
                   let s0 = T.show e
-                      s = T.replace (T.pack commandPath) name s0
                   aLog $ SGR [38,5,235] "! "
                       <> SGR [31,1] (Plain $ name <> ": " <> s0)
-                  aSend (privmsg audience (resultPrefix <> [s]))
 
-                -- TODO use differenct colors
-                onErrLine s = aSend (privmsg audience [s])
+                onErrLine :: Text -> IO ()
+                onErrLine s0 = do
+                  aLog $ SGR [38,5,235] "2 "
+                      <> SGR [31,1] (Plain $ name <> ": " <> s0)
+
                 onOutLine s = aSend (privmsg audience [s])
 
                 extraEnv =
