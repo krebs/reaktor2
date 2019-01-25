@@ -188,13 +188,6 @@ prefixTimestamp s = do
     t <- SGR [38,5,239] . Plain . T.pack <$> getTimestamp
     return (t <> " " <> s)
 
-stripSGR :: Blessings a -> Blessings a
-stripSGR = \case
-    Append t1 t2 -> Append (stripSGR t1) (stripSGR t2)
-    SGR _ t -> stripSGR t
-    Plain x -> Plain x
-    Empty -> Empty
-
 
 getTimestamp :: IO String
 getTimestamp =
