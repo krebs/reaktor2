@@ -7,7 +7,7 @@ module Reaktor
     , run
     ) where
 
-import Blessings
+import Blessings.Text
 import Control.Concurrent.Extended
 import Control.Exception
 import Data.Attoparsec.Text (feed,parse)
@@ -16,6 +16,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Extended as T
+import qualified Data.Text.IO as T
 import Data.Foldable (toList)
 import Data.Time.Clock.System
 import Data.Time.Format
@@ -98,7 +99,7 @@ logger :: System.IO.Handle -> IO (Blessings Text) -> IO ()
 logger h takeLog = forever $ do
     s <- takeLog
     let s' = if lastChar s == '\n' then s else s <> Plain "\n"
-    System.IO.hPutStr h $ pp $ fmap T.unpack s'
+    T.hPutStr h $ pp s'
 
 pinger :: (Message -> IO ()) -> IO ()
 pinger aSend = forever $ do
