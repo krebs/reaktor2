@@ -14,10 +14,11 @@ import Data.Attoparsec.Text (feed,parse)
 import Data.Attoparsec.Text (IResult(Done,Fail,Partial))
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8.Extended as BS
+import qualified Data.Char as C
+import Data.Function (on)
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Extended as T
 import qualified Data.Text.IO as T
-import Data.Foldable (toList)
 import Data.Time.Clock.System
 import Data.Time.Format
 import qualified Network.Simple.TCP as TCP
@@ -54,8 +55,9 @@ run Config{..} getPlugins =
       (putLog, takeLog0) <- newChan
       let
           takeLog1 = if cLogTime then takeLog0 >>= prefixTimestamp else takeLog0
-          takeLog2 = if logToTTY then takeLog1 else stripSGR <$> takeLog1
-          takeLog = takeLog2
+          takeLog2 = showUnprintable <$> takeLog1
+          takeLog3 = if logToTTY then takeLog2 else stripSGR <$> takeLog2
+          takeLog = takeLog3
 
       (putInMsg, takeInMsg) <- newChan
       (putOutMsg, takeOutMsg) <- newChan
@@ -96,10 +98,8 @@ run Config{..} getPlugins =
 
 
 logger :: System.IO.Handle -> IO (Blessings Text) -> IO ()
-logger h takeLog = forever $ do
-    s <- takeLog
-    let s' = if lastChar s == '\n' then s else s <> Plain "\n"
-    T.hPutStr h $ pp s'
+logger h takeLog = forever $ takeLog >>= T.hPutStrLn h . pp
+
 
 pinger :: (Message -> IO ()) -> IO ()
 pinger aSend = forever $ do
@@ -175,13 +175,39 @@ logMsgFilter = \case
     msg -> Just msg
 
 
+showUnprintable :: Blessings Text -> Blessings Text
+showUnprintable =
+    fmap' showU
+  where
+    showU :: Text -> Blessings Text
+    showU =
+        mconcat
+          . map (either Plain (hi . Plain . showLitChars))
+          . toEither (not . C.isPrint)
+
+    -- like Blessings' fmap, but don't wrap the Plain case in another Plain
+    fmap' :: (Text -> Blessings Text) -> Blessings Text -> Blessings Text
+    fmap' f = \case
+        Append t1 t2 -> Append (fmap' f t1) (fmap' f t2)
+        Plain s -> f s
+        SGR pm t -> SGR pm (fmap' f t)
+        Empty -> Empty
+
+    hi = SGR [38,5,79]
+
+    showLitChars :: Text -> Text
+    showLitChars = T.concatMap (T.pack . flip C.showLitChar "")
+
+    toEither :: (Char -> Bool) -> Text -> [Either Text Text]
+    toEither p =
+      map (\s -> if p (T.head s) then Right s else Left s)
+      . T.groupBy ((==) `on` p)
+
+
 privmsg :: Text -> [Text] -> Message
 privmsg msgtarget xs =
     Message Nothing "PRIVMSG" (msgtarget:T.intercalate " " xs:[])
 
-
-lastChar :: Blessings Text -> Char
-lastChar = T.last . last . toList
 
 prefixTimestamp :: Blessings Text -> IO (Blessings Text)
 prefixTimestamp s = do
