@@ -51,6 +51,7 @@ data Hook = Hook
     , hArguments :: [CaptureOr Text]
     , hWorkDir :: Maybe FilePath
     , hCommands :: HashMap Text Command
+    , hTimeout :: Maybe Int
     }
   deriving Show
 
@@ -64,6 +65,7 @@ instance FromJSON Hook where
           <*> v .:? "arguments" .!= []
           <*> v .:? "workdir"
           <*> v .:? "commands" .!= mempty
+          <*> (fmap (*1000000) <$> v .:? "timeoutSec" .!= Just 10)
       _ -> undefined
 
 

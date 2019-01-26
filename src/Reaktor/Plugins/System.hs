@@ -23,6 +23,7 @@ import System.FilePath.Posix (takeBaseName)
 import System.IO (BufferMode(LineBuffering),hSetBuffering)
 import System.IO (Handle,hClose,hPutStr,hIsEOF)
 import System.Process
+import System.Timeout
 import qualified Text.Regex.PCRE.Heavy as RE
 import qualified Text.Regex.PCRE.Light as RE
 
@@ -158,8 +159,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
 
                 cwd = commandWorkDir <|> hWorkDir <|> cWorkDir
 
-            fork commandPath args cwd (Just env) "" onOutLine onErrLine onExit
-              `catch` onExcept
+            fork commandPath args cwd (Just env) "" hTimeout Callbacks{..}
 
           Nothing -> do
             let s = name <> ": command not found"
@@ -167,34 +167,49 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
 
       Nothing -> return ()
 
+data Callbacks = Callbacks
+    { onOutLine :: Text -> IO ()
+    , onErrLine :: Text -> IO ()
+    , onExit :: ExitCode -> IO ()
+    , onExcept :: SomeException -> IO ()
+    }
+
 fork :: FilePath
      -> [String]
      -> Maybe FilePath
      -> Maybe [(String, String)]
      -> String
-     -> (Text -> IO ())
-     -> (Text -> IO ())
-     -> (ExitCode -> IO ())
+     -> Maybe Int
+     -> Callbacks
      -> IO ()
-fork path args cwd env input onOutLine onErrLine onExit = do
-    let
-        p = (proc path args)
-              { cwd = cwd
-              , env = env
-              , std_in = CreatePipe
-              , std_out = CreatePipe
-              , std_err = CreatePipe
-              , close_fds = True
-              , create_group = True
-              , new_session = True
-              }
-    withCreateProcess p $ \(Just inh) (Just outh) (Just errh) ph -> do
+fork path args cwd env input hTimeout Callbacks{..} =
+    forkIO (withTimeout f `catch` onExcept) >> return ()
+  where
+    f = withCreateProcess p $ \(Just inh) (Just outh) (Just errh) ph -> do
       mapM_ forkIO [
           hPutStr inh input `finally` hClose inh,
           hWithLines outh onOutLine,
           hWithLines errh onErrLine
         ]
       waitForProcess ph >>= onExit
+
+    p = (proc path args)
+          { cwd = cwd
+          , env = env
+          , std_in = CreatePipe
+          , std_out = CreatePipe
+          , std_err = CreatePipe
+          , close_fds = True
+          , create_group = True
+          , new_session = True
+          }
+
+    timeoutError = errorWithoutStackTrace "timeout"
+
+    withTimeout =
+        case hTimeout of
+          Just time -> (maybe timeoutError return =<<) . timeout time
+          Nothing -> id
 
 
 hWithLines :: Handle -> (Text -> IO ()) -> IO ()
