@@ -22,7 +22,6 @@ executable reaktor
     network,
     network-simple,
     network-simple-tls,
-    pcre-heavy,
     pcre-light,
     process,
     random,

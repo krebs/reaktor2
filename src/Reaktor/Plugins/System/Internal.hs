@@ -5,7 +5,8 @@ module Reaktor.Plugins.System.Internal where
 import Prelude.Extended
 import Data.Aeson
 import Reaktor ()
-
+import Text.Regex.PCRE.Light (Regex)
+import qualified Text.Regex.PCRE.Light as RE
 
 
 -- TODO this needs better names :)
@@ -46,7 +47,7 @@ instance FromJSON Config where
 
 data Hook = Hook
     { hActivate :: Activate
-    , hPattern :: Maybe ByteString
+    , hPattern :: Maybe Regex
     , hCommand :: CaptureOr Command
     , hArguments :: [CaptureOr Text]
     , hWorkDir :: Maybe FilePath
@@ -60,7 +61,7 @@ instance FromJSON Hook where
       Object v ->
         Hook
           <$> v .:? "activate" .!= Query
-          <*> v .:? "pattern"
+          <*> (fmap (flip RE.compile [RE.utf8]) <$> v .:? "pattern")
           <*> v .: "command"
           <*> v .:? "arguments" .!= []
           <*> v .:? "workdir"

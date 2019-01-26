@@ -13,6 +13,7 @@ import Control.Exception
 import qualified Data.HashMap.Lazy as M
 import qualified Data.List as L
 import qualified Data.Text.Extended as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V
 import Prelude.Extended
@@ -28,7 +29,6 @@ import System.Process
 import System.Posix.Process (getProcessGroupIDOf)
 import System.Posix.Signals (Signal,signalProcessGroup,killProcess)
 import System.Posix.Types (ProcessGroupID)
-import qualified Text.Regex.PCRE.Heavy as RE
 import qualified Text.Regex.PCRE.Light as RE
 
 
@@ -51,30 +51,24 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
     nick <- aGetNick
 
     let
+        match =
+          case hPattern of
+            Just p -> \s ->
+              fmap (map T.decodeUtf8) $
+              RE.match p (T.encodeUtf8 s) [RE.exec_no_utf8_check]
+            Nothing -> const Nothing
+
         isActivated =
           case hActivate of
-            Always -> Just ""
-            Match ->
-              case hPattern of
-                Nothing -> Nothing
-                Just pat ->
-                  let
-                      result = RE.scan patternRE text
-                      patternRE = RE.compile pat [RE.utf8]
-                  in
-                    if null result
-                      then Nothing
-                      else Just ""
+            Always -> pure ""
+            Match -> match text >> pure ""
             Query ->
+              let me = nick <> ":" in
               if
-                | T.isPrefixOf (nick <> ":") text ->
-                  Just (nick <> ":")
-                | T.isPrefixOf "*:" text ->
-                  Just "*:"
-                | isQuery ->
-                  Just ""
-                | otherwise ->
-                  Nothing
+                | isQuery -> pure ""
+                | T.isPrefixOf me text -> pure me
+                | T.isPrefixOf "*:" text -> pure "*:"
+                | otherwise -> mempty
 
         audience = if isQuery then from else msgtarget
 
@@ -90,19 +84,8 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
             cmdline = T.dropWhile (==' ') $ T.drop (T.length trigger) text
             resultPrefix = if isQuery then [] else [from <> ":"]
 
-            parseCommandLine' pat s =
-                if null result then [] else snd (head result)
-              where
-                result = RE.scan patternRE s
-                patternRE = RE.compile pat [RE.utf8]
-
-            captures =
-              V.fromList $
-                case hPattern of
-                  Nothing -> [] -- TODO everything?
-                  Just pat -> parseCommandLine' pat cmdline
-
-            capture i = captures V.!? (i - 1)
+            captures = V.fromList $ fromMaybe [] (match cmdline)
+            capture i = captures V.!? i
 
             name =
               case hCommand of
