@@ -128,26 +128,24 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
             baseEnv <- getEnvironment
 
             let
-                onExit code = do
-                  let s = T.show code
-                      (sig, col) =
-                        if code == ExitSuccess
-                          then (SGR [38,5,235] "* ", SGR [38,5,107])
-                          else (SGR [38,5,235] "! ", SGR [31,1])
-                  aLog $ sig <> col (Plain $ name <> ": " <> s)
+                logStr pid s = do
+                  let p = name <> "[" <> T.show pid <> "] "
+                  aLog $ SGR [38,5,247] (Plain p <> s)
 
-                onExcept :: SomeException -> IO ()
-                onExcept e = do
-                  let s0 = T.show e
-                  aLog $ SGR [38,5,235] "! "
-                      <> SGR [31,1] (Plain $ name <> ": " <> s0)
+                red :: Text -> Blessings Text
+                red = SGR [31] . Plain
 
-                onErrLine :: Text -> IO ()
-                onErrLine s0 = do
-                  aLog $ SGR [38,5,235] "2 "
-                      <> SGR [31,1] (Plain $ name <> ": " <> s0)
+                onStart pid = logStr pid "started"
+                onErrLine pid s = logStr pid $ "stderr: " <> red s
+                onOutLine _ s = aSend (privmsg audience [s])
+                onError pid e = logStr pid $ "failed: " <> red (T.show e)
 
-                onOutLine s = aSend (privmsg audience [s])
+                onExit pid = \case
+                  ExitSuccess ->
+                    logStr pid "stopped"
+                  ExitFailure i ->
+                    logStr pid $ "stopped with exit code " <>
+                      red (T.show $ if i <= 127 then i else -256 + i)
 
                 extraEnv =
                     [ ("_prefix", T.unpack prefix)
@@ -172,10 +170,11 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
       Nothing -> return ()
 
 data Callbacks = Callbacks
-    { onOutLine :: Text -> IO ()
-    , onErrLine :: Text -> IO ()
-    , onExit :: ExitCode -> IO ()
-    , onExcept :: SomeException -> IO ()
+    { onOutLine :: Pid -> Text -> IO ()
+    , onErrLine :: Pid -> Text -> IO ()
+    , onError :: Pid -> SomeException -> IO ()
+    , onExit :: Pid -> ExitCode -> IO ()
+    , onStart :: Pid -> IO ()
     }
 
 fork :: FilePath
@@ -187,25 +186,27 @@ fork :: FilePath
      -> Callbacks
      -> IO ()
 fork path args cwd env input hTimeout Callbacks{..} =
-    forkIO (f `catch` onExcept) >> return ()
+    forkIO (f `catch` onError (-1)) >> return ()
   where
     f = withCreateProcess p $ \(Just inh) (Just outh) (Just errh) ph -> do
       Just pid <- getPid ph
       pgid <- getProcessGroupIDOf pid
 
+      onStart pid
+
       mapM_ forkIO [
           hPutStr inh input `finally` hClose inh,
-          hWithLines outh onOutLine,
-          hWithLines errh onErrLine
+          hWithLines outh (onOutLine pid),
+          hWithLines errh (onErrLine pid)
         ]
 
       case hTimeout of
         Just time ->
           race (threadDelay time) (waitForProcess ph) >>= \case
-            Left () -> onExcept (SomeException (ErrorCall "timeout"))
-            Right code -> onExit code
+            Left () -> onError pid (SomeException (ErrorCall "timeout"))
+            Right code -> onExit pid code
         Nothing ->
-          waitForProcess ph >>= onExit
+          waitForProcess ph >>= onExit pid
 
       killProcessGroup pgid
 
