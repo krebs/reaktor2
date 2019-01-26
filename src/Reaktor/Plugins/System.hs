@@ -10,6 +10,7 @@ import Control.Applicative
 import Control.Concurrent (forkIO,threadDelay)
 import Control.Concurrent.Async (race)
 import Control.Exception
+import Control.Monad (forM_)
 import qualified Data.HashMap.Lazy as M
 import qualified Data.List as L
 import qualified Data.Text.Extended as T
@@ -78,80 +79,77 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
         --      what if our nick has changed?
         isQuery = msgtarget == nick
 
-    case isActivated of
-      Just trigger -> do
-        let
-            cmdline = T.dropWhile (==' ') $ T.drop (T.length trigger) text
-            resultPrefix = if isQuery then [] else [from <> ":"]
+    forM_ isActivated $ \activationPrefix -> do
+      let
+          text' = T.drop (T.length activationPrefix) text
+          resultPrefix = if isQuery then [] else [from <> ":"]
 
-            captures = V.fromList $ fromMaybe [] (match cmdline)
-            capture i = captures V.!? i
+          captures = V.fromList $ fromMaybe [] (match text')
+          capture i = captures V.!? i
 
-            name =
-              case hCommand of
-                Capture i -> fromMaybe "<unnamed>" (capture i)
-                CaptureOr Command{..} -> T.pack $ takeBaseName $ commandPath
+          name =
+            case hCommand of
+              Capture i -> fromMaybe "<unnamed>" (capture i)
+              CaptureOr Command{..} -> T.pack $ takeBaseName $ commandPath
 
-            command =
-              case hCommand of
-                Capture i -> (`M.lookup` hCommands) =<< capture i
-                CaptureOr c -> Just c
+          command =
+            case hCommand of
+              Capture i -> (`M.lookup` hCommands) =<< capture i
+              CaptureOr c -> Just c
 
-            args =
-              map (maybe "" T.unpack)
-                $ L.dropWhileEnd isNothing
-                -- $ map getArgument hArguments
-                $ flip map hArguments
-                $ \case
-                  Capture i -> capture i
-                  CaptureOr s -> Just s
+          args =
+            map (maybe "" T.unpack)
+              $ L.dropWhileEnd isNothing
+              $ flip map hArguments
+              $ \case
+                Capture i -> capture i
+                CaptureOr s -> Just s
 
-        case command of
-          Just Command{..} -> do
-            baseEnv <- getEnvironment
+      case command of
+        Just Command{..} -> do
+          baseEnv <- getEnvironment
 
-            let
-                logStr pid s = do
-                  let p = name <> "[" <> T.show pid <> "] "
-                  aLog $ SGR [38,5,247] (Plain p <> s)
+          let
+              logStr pid s = do
+                let p = name <> "[" <> T.show pid <> "] "
+                aLog $ SGR [38,5,247] (Plain p <> s)
 
-                red :: Text -> Blessings Text
-                red = SGR [31] . Plain
+              red :: Text -> Blessings Text
+              red = SGR [31] . Plain
 
-                onStart pid = logStr pid "started"
-                onErrLine pid s = logStr pid $ "stderr: " <> red s
-                onOutLine _ s = aSend (privmsg audience [s])
-                onError pid e = logStr pid $ "failed: " <> red (T.show e)
+              onStart pid = logStr pid "started"
+              onErrLine pid s = logStr pid $ "stderr: " <> red s
+              onOutLine _ s = aSend (privmsg audience [s])
+              onError pid e = logStr pid $ "failed: " <> red (T.show e)
 
-                onExit pid = \case
-                  ExitSuccess ->
-                    logStr pid "stopped"
-                  ExitFailure i ->
-                    logStr pid $ "stopped with exit code " <>
-                      red (T.show $ if i <= 127 then i else -256 + i)
+              onExit pid = \case
+                ExitSuccess ->
+                  logStr pid "stopped"
+                ExitFailure i ->
+                  logStr pid $ "stopped with exit code " <>
+                    red (T.show $ if i <= 127 then i else -256 + i)
 
-                extraEnv =
-                    [ ("_prefix", T.unpack prefix)
-                    , ("_from", T.unpack from)
-                    , ("_msgtarget", T.unpack msgtarget)
-                    ]
+              extraEnv =
+                  [ ("_prefix", T.unpack prefix)
+                  , ("_from", T.unpack from)
+                  , ("_msgtarget", T.unpack msgtarget)
+                  ]
 
-                env =
-                  M.toList $ mconcat
-                    [ M.fromList extraEnv
-                    , maybe mempty id commandEnv
-                    , M.fromList baseEnv
-                    ]
+              env =
+                M.toList $ mconcat
+                  [ M.fromList extraEnv
+                  , maybe mempty id commandEnv
+                  , M.fromList baseEnv
+                  ]
 
-                cwd = commandWorkDir <|> hWorkDir <|> cWorkDir
+              cwd = commandWorkDir <|> hWorkDir <|> cWorkDir
 
-            fork commandPath args cwd (Just env) "" hTimeout Callbacks{..}
+          fork commandPath args cwd (Just env) "" hTimeout Callbacks{..}
 
-          Nothing -> do
-            let s = name <> ": command not found"
-            aSend (privmsg audience (resultPrefix <> [s]))
+        Nothing -> do
+          let s = name <> ": command not found"
+          aSend (privmsg audience (resultPrefix <> [s]))
 
-      Nothing -> return ()
 
 data Callbacks = Callbacks
     { onOutLine :: Pid -> Text -> IO ()
