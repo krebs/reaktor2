@@ -36,8 +36,8 @@ import qualified Text.Regex.PCRE.Light as RE
 new :: Config -> Actions -> IO (Message -> IO ())
 new config@Config{..} actions@Actions{..} = do
     pure $ \case
-        Message (Just prefix) cmd (msgtarget:text:[]) | elem cmd ["PRIVMSG", "JOIN"] -> do
-          let hooks = maybe [] id (M.lookup cmd cHooks)
+        Message (Just prefix) "PRIVMSG" (msgtarget:text:[]) -> do
+          let hooks = maybe [] id (M.lookup "PRIVMSG" cHooks)
           mapM_ (\h -> run1 config actions h prefix msgtarget text) hooks
 
         Message (Just prefix) "JOIN" (channel:[]) -> do
