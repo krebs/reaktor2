@@ -7,7 +7,8 @@ module Reaktor.Plugins.System (new) where
 
 import Blessings
 import Control.Applicative
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO,threadDelay)
+import Control.Concurrent.Async (race)
 import Control.Exception
 import qualified Data.HashMap.Lazy as M
 import qualified Data.List as L
@@ -22,8 +23,11 @@ import System.Exit
 import System.FilePath.Posix (takeBaseName)
 import System.IO (BufferMode(LineBuffering),hSetBuffering)
 import System.IO (Handle,hClose,hPutStr,hIsEOF)
+import System.IO.Error (catchIOError,isDoesNotExistError)
 import System.Process
-import System.Timeout
+import System.Posix.Process (getProcessGroupIDOf)
+import System.Posix.Signals (Signal,signalProcessGroup,killProcess)
+import System.Posix.Types (ProcessGroupID)
 import qualified Text.Regex.PCRE.Heavy as RE
 import qualified Text.Regex.PCRE.Light as RE
 
@@ -183,15 +187,27 @@ fork :: FilePath
      -> Callbacks
      -> IO ()
 fork path args cwd env input hTimeout Callbacks{..} =
-    forkIO (withTimeout f `catch` onExcept) >> return ()
+    forkIO (f `catch` onExcept) >> return ()
   where
     f = withCreateProcess p $ \(Just inh) (Just outh) (Just errh) ph -> do
+      Just pid <- getPid ph
+      pgid <- getProcessGroupIDOf pid
+
       mapM_ forkIO [
           hPutStr inh input `finally` hClose inh,
           hWithLines outh onOutLine,
           hWithLines errh onErrLine
         ]
-      waitForProcess ph >>= onExit
+
+      case hTimeout of
+        Just time ->
+          race (threadDelay time) (waitForProcess ph) >>= \case
+            Left () -> onExcept (SomeException (ErrorCall "timeout"))
+            Right code -> onExit code
+        Nothing ->
+          waitForProcess ph >>= onExit
+
+      killProcessGroup pgid
 
     p = (proc path args)
           { cwd = cwd
@@ -204,12 +220,15 @@ fork path args cwd env input hTimeout Callbacks{..} =
           , new_session = True
           }
 
-    timeoutError = errorWithoutStackTrace "timeout"
 
-    withTimeout =
-        case hTimeout of
-          Just time -> (maybe timeoutError return =<<) . timeout time
-          Nothing -> id
+killProcessGroup :: ProcessGroupID -> IO ()
+killProcessGroup = signalProcessGroup' killProcess
+
+signalProcessGroup' :: Signal -> ProcessGroupID -> IO ()
+signalProcessGroup' sig pgid =
+    catchIOError
+      (signalProcessGroup sig pgid)
+      (\e -> if isDoesNotExistError e then return () else ioError e)
 
 
 hWithLines :: Handle -> (Text -> IO ()) -> IO ()

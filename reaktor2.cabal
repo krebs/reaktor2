@@ -9,6 +9,7 @@ cabal-version: >=1.10
 executable reaktor
   build-depends:
     aeson,
+    async,
     attoparsec,
     base,
     blessings,
