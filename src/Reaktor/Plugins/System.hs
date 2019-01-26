@@ -150,6 +150,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 extraEnv =
                     [ ("_prefix", T.unpack prefix)
                     , ("_from", T.unpack from)
+                    , ("_msgtarget", T.unpack msgtarget)
                     ]
 
                 env =
