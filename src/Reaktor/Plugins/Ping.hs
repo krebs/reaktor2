@@ -10,6 +10,6 @@ new :: Actions -> IO (Message -> IO ())
 new Actions{..} =
     return $ \case
       Message _ cmd args ->
-        when (cmd == "PING") $
-          aSend (Message Nothing "PONG" args)
+        when (cmd == PING) $
+          aSend (Message Nothing PONG args)
       _ -> pure ()

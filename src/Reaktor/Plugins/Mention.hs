@@ -3,16 +3,16 @@
 {-# LANGUAGE RecordWildCards #-}
 module Reaktor.Plugins.Mention (new) where
 
-import Prelude.Extended
 import qualified Data.Char
 import qualified Data.Text as T
+import Prelude.Extended
 import Reaktor
 
 
 new :: Actions -> IO (Message -> IO ())
 new Actions{..} = do
     pure $ \case
-      Message _ "PRIVMSG" (msgtarget:text:[]) -> do
+      Message _ PRIVMSG (msgtarget:text:[]) -> do
           nick <- aGetNick
           when (isMention nick text) $ do
             aSend (privmsg msgtarget ["I'm famous!"])

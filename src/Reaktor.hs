@@ -28,6 +28,7 @@ import Prelude.Extended
 import Reaktor.Internal
 import Reaktor.Internal as Exports (Actions(..))
 import Reaktor.Internal as Exports (Message(Message,Start))
+import Reaktor.IRC as Exports
 import Reaktor.Internal as Exports (formatMessage)
 import Reaktor.Nick as Exports
 import Reaktor.Nick as Nick
@@ -104,7 +105,7 @@ logger h takeLog = forever $ takeLog >>= T.hPutStrLn h . pp
 pinger :: (Message -> IO ()) -> IO ()
 pinger aSend = forever $ do
     threadDelay time
-    aSend (Message Nothing "PING" ["heartbeat"])
+    aSend (Message Nothing PING ["heartbeat"])
   where
     time = 300 * 1000000
 
@@ -162,10 +163,10 @@ splitter plugins takeInMsg =
 
 logMsgFilter :: Message -> Maybe Message
 logMsgFilter = \case
-    Message _ "PING" _ -> Nothing
-    Message _ "PONG" _ -> Nothing
-    Message p "PRIVMSG" ["NickServ",xs] | check -> do
-        Just (Message p "PRIVMSG" ["NickServ",xs'])
+    Message _ PING _ -> Nothing
+    Message _ PONG _ -> Nothing
+    Message p PRIVMSG ["NickServ",xs] | check -> do
+        Just (Message p PRIVMSG ["NickServ",xs'])
       where
         check = elem cmd ["IDENTIFY","REGAIN"] && length ws > 2
         ws = T.words xs
@@ -206,7 +207,7 @@ showUnprintable =
 
 privmsg :: Text -> [Text] -> Message
 privmsg msgtarget xs =
-    Message Nothing "PRIVMSG" (msgtarget:T.intercalate " " xs:[])
+    Message Nothing PRIVMSG (msgtarget:T.intercalate " " xs:[])
 
 
 prefixTimestamp :: Blessings Text -> IO (Blessings Text)

@@ -5,6 +5,7 @@ module Reaktor.Plugins.System.Internal where
 import Prelude.Extended
 import Data.Aeson
 import Reaktor ()
+import qualified Reaktor.IRC as IRC
 import Text.Regex.PCRE.Light (Regex)
 import qualified Text.Regex.PCRE.Light as RE
 
@@ -30,7 +31,7 @@ instance FromJSON Activate where
 
 data Config = Config
     { cWorkDir :: Maybe FilePath
-    , cHooks :: HashMap Text [Hook]
+    , cHooks :: HashMap IRC.Command [Hook]
     }
   deriving Show
 

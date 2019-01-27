@@ -6,8 +6,10 @@ module Reaktor.Internal where
 import Prelude.Extended
 import Blessings
 import Data.Aeson
+import Data.String.Conversions (convertString)
 import qualified Data.Text as T
 import Network.Socket as Exports (HostName,ServiceName)
+import Reaktor.IRC
 import System.IO
 
 
@@ -50,15 +52,14 @@ instance FromJSON Config where
       tlsPort :: ServiceName
       tlsPort = "6697"
 
-
-data Message = Message (Maybe Text) Text [Text] | Start
+data Message = Message (Maybe Text) Command [Text] | Start
   deriving Show
 
 formatMessage :: Message -> Text
 formatMessage = \case
     Message mb_prefix cmd params ->
       maybe "" ((":"<>) . (<>" ")) mb_prefix
-          <> cmd
+          <> convertString cmd
           <> T.concat (map (" "<>) (init params))
           <> if null params then "" else " :" <> last params
           <> "\r\n"

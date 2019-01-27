@@ -36,12 +36,12 @@ import qualified Text.Regex.PCRE.Light as RE
 new :: Config -> Actions -> IO (Message -> IO ())
 new config@Config{..} actions@Actions{..} = do
     pure $ \case
-        Message (Just prefix) "PRIVMSG" (msgtarget:text:[]) -> do
-          let hooks = maybe [] id (M.lookup "PRIVMSG" cHooks)
+        Message (Just prefix) PRIVMSG (msgtarget:text:[]) -> do
+          let hooks = maybe [] id (M.lookup PRIVMSG cHooks)
           mapM_ (\h -> run1 config actions h prefix msgtarget text) hooks
 
-        Message (Just prefix) "JOIN" (channel:[]) -> do
-          let hooks = maybe [] id (M.lookup "JOIN" cHooks)
+        Message (Just prefix) JOIN (channel:[]) -> do
+          let hooks = maybe [] id (M.lookup JOIN cHooks)
           mapM_ (\h -> run1 config actions h prefix channel "") hooks
 
         _ -> pure ()

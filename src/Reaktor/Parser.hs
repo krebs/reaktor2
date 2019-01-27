@@ -1,11 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Reaktor.Parser where
 
-import Prelude.Extended
 import Control.Applicative
 import Data.Attoparsec.Text
 import qualified Data.Char
+import Data.String.Conversions (convertString)
 import qualified Data.Text.Extended as T
+import Prelude.Extended
+import Reaktor.IRC
 import Reaktor.Internal
 
 
@@ -13,8 +15,9 @@ prefix :: Parser Text
 prefix = T.pack <$> many (satisfy Data.Char.isAlphaNum <|>
                            satisfy (flip elem (":.-@/!~[]\\`_^{|}" :: String)))
 
-command :: Parser Text
-command = T.pack <$> many1 (satisfy Data.Char.isAlphaNum)
+command :: Parser Command
+command =
+    convertString . T.pack <$> many1 (satisfy Data.Char.isAlphaNum)
 
 nospcrlfcl :: Parser Char
 nospcrlfcl =
