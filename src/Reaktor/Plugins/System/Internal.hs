@@ -4,6 +4,7 @@ module Reaktor.Plugins.System.Internal where
 
 import Prelude.Extended
 import Data.Aeson
+import Data.Aeson.Types (typeMismatch)
 import Reaktor ()
 import qualified Reaktor.IRC as IRC
 import Text.Regex.PCRE.Light (Regex)
@@ -27,7 +28,7 @@ instance FromJSON Activate where
       String "always" -> pure Always
       String "match" -> pure Match
       String "query" -> pure Query
-      _ -> undefined
+      invalid -> typeMismatch "Activate" invalid
 
 data Config = Config
     { cWorkDir :: Maybe FilePath
@@ -44,7 +45,7 @@ instance FromJSON Config where
         Config
           <$> v .:? "workdir"
           <*> v .:? "hooks" .!= mempty
-      _ -> undefined
+      invalid -> typeMismatch "Config" invalid
 
 data Hook = Hook
     { hActivate :: Activate
@@ -68,7 +69,7 @@ instance FromJSON Hook where
           <*> v .:? "workdir"
           <*> v .:? "commands" .!= mempty
           <*> (fmap (*1000000) <$> v .:? "timeoutSec" .!= Just 10)
-      _ -> undefined
+      invalid -> typeMismatch "Hook" invalid
 
 
 data SystemCommand = SystemCommand
@@ -85,5 +86,4 @@ instance FromJSON SystemCommand where
           <$> v .: "filename"
           <*> v .:? "workdir"
           <*> v .:? "env"
-      _ -> undefined
-
+      invalid -> typeMismatch "SystemCommand" invalid

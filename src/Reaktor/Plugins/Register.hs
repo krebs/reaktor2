@@ -6,6 +6,7 @@ module Reaktor.Plugins.Register where
 
 import Blessings
 import Data.Aeson
+import Data.Aeson.Types (typeMismatch)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Prelude.Extended
@@ -23,7 +24,7 @@ instance FromJSON ConfigNickServ where
       ConfigNickServ
         <$> v .: "passFile"
         <*> v .:? "prefix" .!= "NickServ!NickServ@services."
-    _ -> undefined
+    invalid -> typeMismatch "ConfigNickServ" invalid
 
 data Config = Config
     { cNick :: Maybe Text
@@ -43,7 +44,7 @@ instance FromJSON Config where
       cChannels <- v .:? "channels" .!= []
       cNickServ <- v .:? "NickServ" .!= cNickServ def
       pure Config{..}
-    _ -> undefined
+    invalid -> typeMismatch "Config" invalid
 
 new :: Config -> Actions -> IO (Message -> IO ())
 new Config{..} Actions{..} = do

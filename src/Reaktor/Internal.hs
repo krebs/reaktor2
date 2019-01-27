@@ -6,6 +6,7 @@ module Reaktor.Internal where
 import Prelude.Extended
 import Blessings
 import Data.Aeson
+import Data.Aeson.Types (typeMismatch)
 import Data.String.Conversions (convertString)
 import qualified Data.Text as T
 import Network.Socket as Exports (HostName,ServiceName)
@@ -47,7 +48,7 @@ instance FromJSON Config where
         cLogHandle <- pure (cLogHandle def)
         cLogTime <- v .:? "logTime" .!= cLogTime def
         pure Config{..}
-      _ -> undefined
+      invalid -> typeMismatch "Config" invalid
     where
       tlsPort :: ServiceName
       tlsPort = "6697"
