@@ -49,10 +49,10 @@ instance FromJSON Config where
 data Hook = Hook
     { hActivate :: Activate
     , hPattern :: Maybe Regex
-    , hCommand :: CaptureOr Command
+    , hCommand :: CaptureOr SystemCommand
     , hArguments :: [CaptureOr Text]
     , hWorkDir :: Maybe FilePath
-    , hCommands :: HashMap Text Command
+    , hCommands :: HashMap Text SystemCommand
     , hTimeout :: Maybe Int
     }
   deriving Show
@@ -71,17 +71,17 @@ instance FromJSON Hook where
       _ -> undefined
 
 
-data Command = Command
-    { commandPath :: FilePath
-    , commandWorkDir :: Maybe FilePath
-    , commandEnv :: Maybe (HashMap String String)
+data SystemCommand = SystemCommand
+    { scPath :: FilePath
+    , scWorkDir :: Maybe FilePath
+    , scEnv :: Maybe (HashMap String String)
     }
   deriving Show
 
-instance FromJSON Command where
+instance FromJSON SystemCommand where
   parseJSON = \case
       Object v ->
-        Command
+        SystemCommand
           <$> v .: "filename"
           <*> v .:? "workdir"
           <*> v .:? "env"

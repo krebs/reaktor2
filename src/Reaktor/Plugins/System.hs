@@ -90,7 +90,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
           name =
             case hCommand of
               Capture i -> fromMaybe "<unnamed>" (capture i)
-              CaptureOr Command{..} -> T.pack $ takeBaseName $ commandPath
+              CaptureOr SystemCommand{..} -> T.pack $ takeBaseName $ scPath
 
           command =
             case hCommand of
@@ -106,7 +106,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 CaptureOr s -> Just s
 
       case command of
-        Just Command{..} -> do
+        Just SystemCommand{..} -> do
           baseEnv <- getEnvironment
 
           let
@@ -138,13 +138,13 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
               env =
                 M.toList $ mconcat
                   [ M.fromList extraEnv
-                  , maybe mempty id commandEnv
+                  , maybe mempty id scEnv
                   , M.fromList baseEnv
                   ]
 
-              cwd = commandWorkDir <|> hWorkDir <|> cWorkDir
+              cwd = scWorkDir <|> hWorkDir <|> cWorkDir
 
-          fork commandPath args cwd (Just env) "" hTimeout Callbacks{..}
+          fork scPath args cwd (Just env) "" hTimeout Callbacks{..}
 
         Nothing -> do
           let s = name <> ": command not found"
