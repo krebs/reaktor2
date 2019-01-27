@@ -10,6 +10,7 @@ module Reaktor
 import Blessings.Text
 import Control.Concurrent.Extended
 import Control.Exception
+import Control.Monad (forM_)
 import Data.Attoparsec.Text (feed,parse)
 import Data.Attoparsec.Text (IResult(Done,Fail,Partial))
 import Data.ByteString (ByteString)
@@ -71,11 +72,9 @@ run Config{..} getPlugins =
           aSend msg = logMsg msg >> putOutMsg msg
 
           logMsg msg =
-              case logMsgFilter msg of
-                Just msg' -> do
-                  let bs = formatMessage msg'
-                  aLog $ SGR [38,5,235] "> " <> SGR [35,1] (Plain bs)
-                Nothing -> return ()
+              forM_ (logMsgFilter msg) $ \msg' -> do
+                let bs = formatMessage msg'
+                aLog $ SGR [38,5,235] "> " <> SGR [35,1] (Plain bs)
 
       mapM_ (\(s, f) -> installHandler s (Catch f) Nothing) [
           (sigINT, shutdown)
@@ -143,11 +142,9 @@ receiver Actions{..} putInMsg sockRecv =
     logErr s = aLog $ SGR [31,1] ("! receive: " <> s)
 
     logMsg msg =
-        case logMsgFilter msg of
-          Just msg' -> do
-            let bs = formatMessage msg'
-            aLog $ SGR [38,5,235] "< " <> SGR [38,5,244] (Plain bs)
-          Nothing -> return ()
+        forM_ (logMsgFilter msg) $ \msg' -> do
+          let bs = formatMessage msg'
+          aLog $ SGR [38,5,235] "< " <> SGR [38,5,244] (Plain bs)
 
 
 sender :: IO Message -> (ByteString -> IO ()) -> IO ()
