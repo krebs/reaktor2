@@ -10,7 +10,7 @@ import Control.Applicative
 import Control.Concurrent (forkIO,threadDelay)
 import Control.Concurrent.Async (race)
 import Control.Exception
-import Control.Monad (forM_)
+import Control.Monad.Extended (forM_,untilM_)
 import qualified Data.HashMap.Lazy as M
 import qualified Data.List as L
 import qualified Data.Text.Extended as T
@@ -217,9 +217,4 @@ signalProcessGroup' sig pgid =
 hWithLines :: Handle -> (Text -> IO ()) -> IO ()
 hWithLines h f = do
     hSetBuffering h LineBuffering
-    go `finally` hClose h
-  where
-    go =
-      hIsEOF h >>= \case
-        True -> return ()
-        False -> T.hGetLine h >>= f >> go
+    untilM_ (hIsEOF h) (T.hGetLine h >>= f) `finally` hClose h
