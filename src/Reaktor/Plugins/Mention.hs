@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Reaktor.Plugins.Mention (new) where
 
-import qualified Data.Char
+import qualified Data.Char.Extended as C
 import qualified Data.Text as T
 import Prelude.Extended
 import Reaktor
@@ -20,4 +20,4 @@ new Actions{..} = do
   where
     isMention nick text =
       not (T.isPrefixOf (nick <> ":") text) &&
-      any (==nick) (T.split (not . Data.Char.isAlphaNum) text)
+      any (==nick) (T.split (not . C.isNick) text)
