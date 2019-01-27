@@ -139,6 +139,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
                 M.toList $ mconcat
                   [ M.fromList extraEnv
                   , maybe mempty id scEnv
+                  , maybe mempty id hEnv
                   , M.fromList baseEnv
                   ]
 

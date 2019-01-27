@@ -52,6 +52,7 @@ data Hook = Hook
     , hPattern :: Maybe Regex
     , hCommand :: CaptureOr SystemCommand
     , hArguments :: [CaptureOr Text]
+    , hEnv :: Maybe (HashMap String String)
     , hWorkDir :: Maybe FilePath
     , hCommands :: HashMap Text SystemCommand
     , hTimeout :: Maybe Int
@@ -66,6 +67,7 @@ instance FromJSON Hook where
           <*> (fmap (flip RE.compile [RE.utf8]) <$> v .:? "pattern")
           <*> v .: "command"
           <*> v .:? "arguments" .!= []
+          <*> v .:? "env"
           <*> v .:? "workdir"
           <*> v .:? "commands" .!= mempty
           <*> (fmap (*1000000) <$> v .:? "timeoutSec" .!= Just 10)
