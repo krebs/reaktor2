@@ -32,11 +32,12 @@ data Config = Config
     , cNick :: Maybe Text
     , cLogHandle :: Handle
     , cLogTime :: Bool
+    , cSendDelay :: Maybe Int
     }
   deriving Show
 
 instance Default Config where
-  def = Config False "irc.r" "6667" Nothing stderr True
+  def = Config False "irc.r" "6667" Nothing stderr True Nothing
 
 instance FromJSON Config where
   parseJSON = \case
@@ -47,6 +48,7 @@ instance FromJSON Config where
         cNick <- v .:? "nick"
         cLogHandle <- pure (cLogHandle def)
         cLogTime <- v .:? "logTime" .!= cLogTime def
+        cSendDelay <- fmap (round . (*(1e6 :: Float))) <$> v .:? "sendDelaySec"
         pure Config{..}
       invalid -> typeMismatch "Config" invalid
     where

@@ -86,7 +86,7 @@ run Config{..} getPlugins =
           receiver actions putInMsg sockRecv,
           logger cLogHandle takeLog,
           pinger aSend,
-          sender takeOutMsg sockSend,
+          sender cSendDelay takeOutMsg sockSend,
           splitter plugins takeInMsg
         ]
 
@@ -147,9 +147,12 @@ receiver Actions{..} putInMsg sockRecv =
           aLog $ SGR [38,5,235] "< " <> SGR [38,5,244] (Plain bs)
 
 
-sender :: IO Message -> (ByteString -> IO ()) -> IO ()
-sender takeOutMsg sockSend =
-    forever $ takeOutMsg >>= sockSend . T.encodeUtf8 . formatMessage
+sender :: Maybe Int -> IO Message -> (ByteString -> IO ()) -> IO ()
+sender cSendDelay takeOutMsg sockSend =
+    forever send
+  where
+    send = maybe send0 ((send0 >>) . threadDelay) cSendDelay
+    send0 = takeOutMsg >>= sockSend . T.encodeUtf8 . formatMessage
 
 splitter :: [Message -> IO ()] -> IO Message -> IO ()
 splitter plugins takeInMsg =
