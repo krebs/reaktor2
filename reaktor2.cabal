@@ -26,6 +26,7 @@ executable reaktor
     pcre-light,
     process,
     random,
+    servant-server,
     string-conversions,
     stringsearch,
     text,
@@ -34,7 +35,9 @@ executable reaktor
     unagi-chan,
     unix,
     unordered-containers,
-    vector
+    vector,
+    wai,
+    warp
   default-language: Haskell2010
   ghc-options: -O2 -Wall -threaded
   hs-source-dirs: src

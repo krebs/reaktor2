@@ -26,6 +26,7 @@ import qualified Network.Simple.TCP as TCP
 import qualified Network.Simple.TCP.TLS as TLS
 import Network.Socket as Exports (HostName,ServiceName)
 import Prelude.Extended
+import qualified Reaktor.API as API
 import Reaktor.Internal
 import Reaktor.Internal as Exports (Actions(..))
 import Reaktor.Internal as Exports (Message(Message,Start))
@@ -83,6 +84,7 @@ run Config{..} getPlugins =
       plugins <- getPlugins actions
 
       threads <- mapM (\f -> forkIO $ f `finally` shutdown) [
+          API.main actions,
           receiver actions putInMsg sockRecv,
           logger cLogHandle takeLog,
           pinger aSend,
