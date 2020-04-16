@@ -58,6 +58,15 @@ instance FromJSON Config where
 data Message = Message (Maybe Text) Command [Text] | Start
   deriving Show
 
+instance FromJSON Message where
+  parseJSON = \case
+      Object v -> do
+        mb_prefix <- v .:? "prefix"
+        cmd <- v .: "command"
+        params <- v .: "params"
+        pure (Message mb_prefix cmd params)
+      invalid -> typeMismatch "Message" invalid
+
 formatMessage :: Message -> Text
 formatMessage = \case
     Message mb_prefix cmd params ->
