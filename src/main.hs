@@ -23,7 +23,7 @@ main = do
 
     v <- preview _Value <$> readFile configPath
 
-    Reaktor.run (reaktorConfig v) $ \actions ->
+    Reaktor.run (reaktorConfig v) (apiConfig v) $ \actions ->
       mapM id [
         Reaktor.Plugins.Mention.new actions,
         Reaktor.Plugins.Ping.new actions,
@@ -31,6 +31,11 @@ main = do
         Reaktor.Plugins.System.new (pluginConfig "system" v) actions
       ]
 
+
+apiConfig :: (FromJSON b) => Maybe Value -> Maybe b
+apiConfig = \case
+    Just v -> maybe Nothing parseOrDie (v ^? key "API")
+    Nothing -> Nothing
 
 reaktorConfig :: (FromJSON b, Default b) => Maybe Value -> b
 reaktorConfig = maybe def parseOrDie

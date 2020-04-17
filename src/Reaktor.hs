@@ -41,8 +41,8 @@ import System.IO (hIsTerminalDevice)
 import System.Posix.Signals
 
 
-run :: Config -> (Actions -> IO [Message -> IO ()]) -> IO ()
-run Config{..} getPlugins =
+run :: Config -> Maybe API.Config -> (Actions -> IO [Message -> IO ()]) -> IO ()
+run Config{..} apiConfig getPlugins =
     if cUseTLS then do
       s <- TLS.getDefaultClientSettings (cHostName, BS.pack cServiceName)
       TLS.connect s cHostName cServiceName $ \(ctx, sockAddr) ->
@@ -84,7 +84,7 @@ run Config{..} getPlugins =
       plugins <- getPlugins actions
 
       threads <- mapM (\f -> forkIO $ f `finally` shutdown) [
-          API.main actions,
+          API.main actions apiConfig,
           receiver actions putInMsg sockRecv,
           logger cLogHandle takeLog,
           pinger aSend,

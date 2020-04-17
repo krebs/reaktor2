@@ -23,6 +23,7 @@ executable reaktor
     network,
     network-simple,
     network-simple-tls,
+    network-uri,
     pcre-light,
     process,
     random,
