@@ -44,7 +44,7 @@ import System.Posix.Signals
 run :: Config -> Maybe API.Config -> (Actions -> IO [Message -> IO ()]) -> IO ()
 run Config{..} apiConfig getPlugins =
     if cUseTLS then do
-      s <- TLS.getDefaultClientSettings (cHostName, BS.pack cServiceName)
+      s <- TLS.newDefaultClientParams (cHostName, BS.pack cServiceName)
       TLS.connect s cHostName cServiceName $ \(ctx, sockAddr) ->
         withSocket sockAddr (TLS.send ctx) (TLS.recv ctx)
     else do
