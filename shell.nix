@@ -12,7 +12,7 @@
 
   drv = haskellPackages.callPackage (import ./.) {};
 
-  exeName = "Reaktor";
+  exeName = "reaktor";
 in
 
   lib.overrideDerivation drv.env (oldAttrs: {
