@@ -85,6 +85,9 @@ main Actions{..} = \case
         msg@(Message Nothing PRIVMSG [msgtarget,_]) | isChannelName msgtarget -> do
             liftIO $ aSend msg
             return NoContent
+        msg@(Message Nothing TOPIC [msgtarget,_]) | isChannelName msgtarget -> do
+            liftIO $ aSend msg
+            return NoContent
         _ ->
             throwError err403
       where
