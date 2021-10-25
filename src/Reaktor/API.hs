@@ -79,7 +79,6 @@ main Actions{..} = \case
 
     serveTest :: Message -> Handler NoContent
     serveTest = \case
-        -- Allowing just private messages to (registered) channels for now.
         msg@(Message Nothing PRIVMSG [msgtarget,_]) | isChannelName msgtarget -> do
             liftIO $ aSend msg
             return NoContent
