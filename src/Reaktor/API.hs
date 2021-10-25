@@ -79,6 +79,9 @@ main Actions{..} = \case
 
     serveTest :: Message -> Handler NoContent
     serveTest = \case
+        msg@(Message Nothing NOTICE [msgtarget,_]) | isChannelName msgtarget -> do
+            liftIO $ aSend msg
+            return NoContent
         msg@(Message Nothing PRIVMSG [msgtarget,_]) | isChannelName msgtarget -> do
             liftIO $ aSend msg
             return NoContent
