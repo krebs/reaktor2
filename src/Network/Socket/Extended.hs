@@ -12,6 +12,20 @@ module Network.Socket.Extended
 import qualified Network.Socket as Exports
 
 import Network.Socket
+    ( AddrInfo(AddrInfo)
+    , Family(AF_UNIX, AF_INET, AF_INET6)
+    , SockAddr(SockAddrInet, SockAddrInet6, SockAddrUnix)
+    , Socket
+    , SocketType(Stream)
+    , bind
+    , close
+    , defaultProtocol
+    , getAddrInfo
+    , getSocketName
+    , listen
+    , maxListenQueue
+    , socket
+    )
 import Network.URI
 import Network.Wai.Handler.Warp (Port)
 import System.Posix.Files.Extended (removeIfExists)
