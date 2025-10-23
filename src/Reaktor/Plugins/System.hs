@@ -13,7 +13,7 @@ import Control.Exception
 import Control.Monad.Extended (forM_,untilM_)
 import qualified Data.HashMap.Lazy as M
 import qualified Data.List as L
-import qualified Data.Text.Extended as T
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO as T
 import qualified Data.Vector as V

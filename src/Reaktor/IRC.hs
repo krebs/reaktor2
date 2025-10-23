@@ -12,7 +12,7 @@ import Data.Aeson.Types (typeMismatch)
 import qualified Data.HashMap.Lazy as M
 import Data.Hashable (Hashable)
 import Data.String.Conversions
-import qualified Data.Text.Extended as T
+import qualified Data.Text as T
 import qualified Data.Text.Read as T
 import GHC.Generics (Generic)
 import Prelude.Extended

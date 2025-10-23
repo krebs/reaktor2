@@ -5,7 +5,7 @@ import Control.Applicative
 import Data.Attoparsec.Text
 import qualified Data.Char
 import Data.String.Conversions (convertString)
-import qualified Data.Text.Extended as T
+import qualified Data.Text as T
 import Prelude.Extended
 import Reaktor.IRC
 import Reaktor.Internal

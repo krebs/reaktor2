@@ -17,8 +17,8 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8.Extended as BS
 import qualified Data.Char as C
 import Data.Function (on)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import qualified Data.Text.Extended as T
 import qualified Data.Text.IO as T
 import Data.Time.Clock.System
 import Data.Time.Format
