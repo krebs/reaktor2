@@ -165,6 +165,8 @@ splitter plugins takeInMsg =
 
 logMsgFilter :: Message -> Maybe Message
 logMsgFilter = \case
+    Message p AUTHENTICATE [s] | not (elem s ["PLAIN", "+"]) ->
+        Just (Message p AUTHENTICATE ["***REDACTED***"])
     Message _ PING _ -> Nothing
     Message _ PONG _ -> Nothing
     Message p PRIVMSG ["NickServ",xs] | check -> do

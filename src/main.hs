@@ -13,6 +13,7 @@ import qualified Reaktor
 import qualified Reaktor.Plugins.Mention
 import qualified Reaktor.Plugins.Ping
 import qualified Reaktor.Plugins.Register
+import qualified Reaktor.Plugins.SASL
 import qualified Reaktor.Plugins.System
 import qualified System.Environment
 
@@ -28,6 +29,7 @@ main = do
         Reaktor.Plugins.Mention.new actions,
         Reaktor.Plugins.Ping.new actions,
         Reaktor.Plugins.Register.new (pluginConfig "register" v) actions,
+        Reaktor.Plugins.SASL.new (pluginConfig "sasl" v) actions,
         Reaktor.Plugins.System.new (pluginConfig "system" v) actions
       ]
 

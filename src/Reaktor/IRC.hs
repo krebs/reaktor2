@@ -20,7 +20,9 @@ import Prelude.Extended
 data Command =
     UnknownCommand Text | UnknownReply Int
     | ADMIN
+    | AUTHENTICATE
     | AWAY
+    | CAP
     | CONNECT
     | DIE
     | ERROR
@@ -207,6 +209,15 @@ data Command =
     | ERR_NOOPERHOST
     | ERR_UMODEUNKNOWNFLAG
     | ERR_USERSDONTMATCH
+
+    | RPL_LOGGEDIN
+    | RPL_LOGGEDOUT
+    | ERR_NICKLOCKED
+    | RPL_SASLSUCCESS
+    | ERR_SASLFAIL
+    | ERR_SASLTOOLONG
+    | ERR_SASLABORTED
+    | ERR_SASLALREADY
   deriving (Eq,Generic,Hashable,Show)
 
 instance ConvertibleStrings Text Command where
@@ -239,7 +250,9 @@ instance FromJSONKey Command where
 commands :: [(Text, Command)]
 commands =
     [ ("ADMIN", ADMIN)
+    , ("AUTHENTICATE", AUTHENTICATE)
     , ("AWAY", AWAY)
+    , ("CAP", CAP)
     , ("CONNECT", CONNECT)
     , ("DIE", DIE)
     , ("ERROR", ERROR)
@@ -429,6 +442,15 @@ replies =
     , (491, ERR_NOOPERHOST)
     , (501, ERR_UMODEUNKNOWNFLAG)
     , (502, ERR_USERSDONTMATCH)
+
+    , (900, RPL_LOGGEDIN)
+    , (901, RPL_LOGGEDOUT)
+    , (902, ERR_NICKLOCKED)
+    , (903, RPL_SASLSUCCESS)
+    , (904, ERR_SASLFAIL)
+    , (905, ERR_SASLTOOLONG)
+    , (906, ERR_SASLABORTED)
+    , (907, ERR_SASLALREADY)
     ]
 
 mCommandText :: HashMap Command Text

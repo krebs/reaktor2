@@ -70,3 +70,22 @@
     curl -fsSv --unix-socket /path/to/reaktor.sock http://dontcare/ \
         -H content-type:application/json \
         -d "$(jq -n '{command:"PRIVMSG",params:["#somechannel","derp!"]}')"
+
+# SASL
+
+  To use SASL for authentication, merge following snippet into your configuration:
+
+    {
+      "plugins": [
+        {
+          "plugin": "sasl",
+          "config": {
+            "mechanism": "PLAIN",
+            "username": "somename",
+            "password": "SOMEPASSWORD"
+          }
+        }
+      ]
+    }
+
+  Note that at the moment only SASL PLAIN is supported.

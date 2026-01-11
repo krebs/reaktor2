@@ -12,6 +12,7 @@ executable reaktor
     async,
     attoparsec,
     base,
+    base64,
     blessings,
     bytestring,
     containers,
@@ -55,6 +56,7 @@ executable reaktor
     Reaktor.Plugins.Mention
     Reaktor.Plugins.Ping
     Reaktor.Plugins.Register
+    Reaktor.Plugins.SASL
     Reaktor.Plugins.System
     Reaktor.Plugins.System.Internal
     System.Posix.Files.Extended
