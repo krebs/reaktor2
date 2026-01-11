@@ -39,6 +39,25 @@ executable reaktor
     vector,
     wai,
     warp
+  other-modules:
+    Control.Concurrent.Extended
+    Control.Monad.Extended
+    Data.ByteString.Char8.Extended
+    Data.Char.Extended
+    Network.Socket.Extended
+    Prelude.Extended
+    Reaktor
+    Reaktor.API
+    Reaktor.IRC
+    Reaktor.Internal
+    Reaktor.Nick
+    Reaktor.Parser
+    Reaktor.Plugins.Mention
+    Reaktor.Plugins.Ping
+    Reaktor.Plugins.Register
+    Reaktor.Plugins.System
+    Reaktor.Plugins.System.Internal
+    System.Posix.Files.Extended
   default-language: Haskell2010
   ghc-options: -O2 -Wall -threaded
   hs-source-dirs: src
