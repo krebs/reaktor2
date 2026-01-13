@@ -17,8 +17,10 @@ executable reaktor
     bytestring,
     containers,
     data-default,
+    directory,
     filepath,
     hashable,
+    http-types,
     lens,
     lens-aeson,
     network,
@@ -43,6 +45,7 @@ executable reaktor
   other-modules:
     Control.Concurrent.Extended
     Control.Monad.Extended
+    Data.Aeson.Reference
     Data.ByteString.Char8.Extended
     Data.Char.Extended
     Network.Socket.Extended
