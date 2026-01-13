@@ -14,6 +14,13 @@
       "pass": "somepass"
     }
 
+  or, if the password should be read from a separate file containing a JSON value, then:
+
+    {
+      "nick": "somenick",
+      "pass": { "$ref": "path/to/pass.json" }
+    }
+
   then enter the Nix shell for development:
 
     cabal2nix . > default.nix && nix-shell -I stockholm=~/stockholm

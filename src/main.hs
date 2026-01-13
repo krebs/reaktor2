@@ -3,11 +3,9 @@
 module Main (main) where
 
 import Control.Lens
-import Data.Aeson
-import Data.Aeson (Value)
 import Data.Aeson.Lens
+import Data.Aeson.Reference (resolveReference)
 import Data.Aeson.Types
-import Data.Text (Text)
 import Prelude.Extended
 import qualified Reaktor
 import qualified Reaktor.Plugins.Mention
@@ -16,13 +14,14 @@ import qualified Reaktor.Plugins.Register
 import qualified Reaktor.Plugins.SASL
 import qualified Reaktor.Plugins.System
 import qualified System.Environment
+import qualified Data.Text as Text
 
 
 main :: IO ()
 main = do
     [configPath] <- System.Environment.getArgs
 
-    v <- preview _Value <$> readFile configPath
+    v <- either error (preview _Value) <$> resolveReference "." (Text.pack configPath)
 
     Reaktor.run (reaktorConfig v) (apiConfig v) $ \actions ->
       mapM id [
