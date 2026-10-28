@@ -30,7 +30,6 @@ import System.Process
 import System.Posix.Process (getProcessGroupIDOf)
 import System.Posix.Signals (Signal,signalProcessGroup,killProcess)
 import System.Posix.Types (ProcessGroupID)
-import qualified Text.Regex.PCRE.Light as RE
 
 
 new :: Config -> Actions -> IO (Message -> IO ())
@@ -56,7 +55,7 @@ run1 Config{..} Actions{..} Hook{..} prefix msgtarget text = do
           case hPattern of
             Just p -> \s ->
               fmap (map T.decodeUtf8) $
-              RE.match p (T.encodeUtf8 s) [RE.exec_no_utf8_check]
+              matchRegex p (T.encodeUtf8 s)
             Nothing -> const Nothing
 
         isActivated =
