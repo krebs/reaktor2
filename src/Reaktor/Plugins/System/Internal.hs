@@ -7,8 +7,13 @@ import Data.Aeson
 import Data.Aeson.Types (typeMismatch)
 import Reaktor ()
 import qualified Reaktor.IRC as IRC
-import Text.Regex.PCRE.Light (Regex)
-import qualified Text.Regex.PCRE.Light as RE
+import qualified Data.ByteString as BS
+import Data.Array (elems)
+import qualified Data.List as L
+import System.IO.Unsafe (unsafePerformIO)
+import Text.Regex.PCRE2.ByteString (Regex)
+import qualified Text.Regex.PCRE2.ByteString as RE
+import Text.Regex.Base.RegexLike (makeRegexOpts)
 
 
 -- TODO this needs better names :)
@@ -64,7 +69,7 @@ instance FromJSON Hook where
       Object v ->
         Hook
           <$> v .:? "activate" .!= Query
-          <*> (fmap (flip RE.compile [RE.utf8]) <$> v .:? "pattern")
+          <*> (fmap compileRegex <$> v .:? "pattern")
           <*> v .: "command"
           <*> v .:? "arguments" .!= []
           <*> v .:? "env"
@@ -72,6 +77,26 @@ instance FromJSON Hook where
           <*> v .:? "commands" .!= mempty
           <*> (fmap (*1000000) <$> v .:? "timeoutSec" .!= Just 10)
       invalid -> typeMismatch "Hook" invalid
+
+instance Show Regex where
+  show _ = "<Regex>"
+
+compileRegex :: ByteString -> Regex
+compileRegex = makeRegexOpts RE.compUTF RE.matchNoUTFCheck
+
+-- | Like pcre-light's match: Nothing on no match or error, otherwise the
+-- whole match followed by the captures up to the last one that is set,
+-- where unset captures are empty.
+matchRegex :: Regex -> ByteString -> Maybe [ByteString]
+matchRegex r s =
+    case unsafePerformIO (RE.execute r s) of
+      Right (Just a) ->
+        Just $ map substring $ L.dropWhileEnd ((== RE.unusedOffset) . fst) $ elems a
+      _ -> Nothing
+  where
+    substring (o, l)
+      | o == RE.unusedOffset = BS.empty
+      | otherwise = BS.take l (BS.drop o s)
 
 
 data SystemCommand = SystemCommand

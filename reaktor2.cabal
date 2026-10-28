@@ -9,6 +9,7 @@ cabal-version: >=1.10
 executable reaktor
   build-depends:
     aeson,
+    array,
     async,
     attoparsec,
     base,
@@ -27,9 +28,10 @@ executable reaktor
     network-simple,
     network-simple-tls,
     network-uri,
-    pcre-light,
     process,
     random,
+    regex-base,
+    regex-pcre2,
     servant-server,
     string-conversions,
     stringsearch,
